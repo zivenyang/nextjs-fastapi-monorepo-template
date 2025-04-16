@@ -8,14 +8,17 @@
     "dist"
   ],
   "exports": {
-    "./styles.css": "./dist/index.css",
-    "./*": "./src/*.tsx"
+    "./globals.css": "./src/styles/globals.css",
+    "./postcss.config": "./postcss.config.js",
+    "./lib/*": "./src/lib/*.ts",
+    "./components/*": "./src/components/*.tsx",
+    "./hooks/*": "./src/hooks/*.ts"
   },
   "license": "MIT",
   "scripts": {
-    "build": "tailwindcss -i ./src/styles.css -o ./dist/index.css",
+    "build": "tailwindcss -i ./src/styles/globals.css -o ./dist/index.css",
     "check-types": "tsc --noEmit",
-    "dev": "tailwindcss -i ./src/styles.css -o ./dist/index.css --watch",
+    "dev": "tailwindcss -i ./src/styles/globals.css -o ./dist/index.css --watch",
     "lint": "eslint src --max-warnings 0"
   },
   "peerDependencies": {
@@ -23,7 +26,6 @@
   },
   "devDependencies": {
     "@repo/eslint-config": "*",
-    "@repo/tailwind-config": "*",
     "@repo/typescript-config": "*",
     "@types/react": "^19.1.0",
     "autoprefixer": "^10.4.20",
@@ -31,5 +33,15 @@
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "5.8.2"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.2.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.488.0",
+    "next-themes": "^0.4.6",
+    "tailwind-merge": "^3.2.0",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.24.2"
   }
 }
