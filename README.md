@@ -1,58 +1,68 @@
-# Turborepo Tailwind CSS starter
+# Turborepo Tailwind CSS 入门模板
 
-This Turborepo starter is maintained by the Turborepo core team.
+这个 Turborepo 入门模板由 Turborepo 核心团队维护。它提供了一个基础配置，用于构建使用 Next.js、Tailwind CSS 和共享 UI 组件的 Web 应用。
 
-## Using this example
+## 如何使用这个模板
 
-Run the following command:
+要基于此模板创建一个新项目，请运行以下命令：
 
 ```sh
-npx create-turbo@latest -e with-tailwind
+git clone https://github.com/zivenyang/nextjs-fastapi-template.git
 ```
 
-## What's inside?
+## 项目包含什么？
 
-This Turborepo includes the following packages/apps:
+这个 Turborepo 项目包含了以下的包（packages）和应用（applications）：
 
-### Apps and Packages
+### 应用和包
 
-- `docs`: a [Next.js](https://nextjs.org/) app with [Tailwind CSS](https://tailwindcss.com/)
-- `web`: another [Next.js](https://nextjs.org/) app with [Tailwind CSS](https://tailwindcss.com/)
-- `ui`: a stub React component library with [Tailwind CSS](https://tailwindcss.com/) shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- `apps/docs`: 一个 [Next.js](https://nextjs.org/) 应用（例如，用于文档）。
+- `apps/web`: 另一个 [Next.js](https://nextjs.org/) 应用（例如，主要的 Web 应用）。
+- `packages/ui`: 一个共享的 React 组件库，使用了 [Tailwind CSS](https://tailwindcss.com/) & [shadcn/ui](https://ui.shadcn.com/)。这里的组件可以被多个应用共用。
+- `packages/eslint-config`: 共享的 [ESLint](https://eslint.org/) 配置。
+- `packages/typescript-config`: 在整个 monorepo 中使用的共享 `tsconfig.json` 配置。
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+所有的包和应用都是用 [TypeScript](https://www.typescriptlang.org/) 编写的。
 
-### Building packages/ui
+### 构建 `packages/ui`
 
-This example is set up to produce compiled styles for `ui` components into the `dist` directory. The component `.tsx` files are consumed by the Next.js apps directly using `transpilePackages` in `next.config.ts`. This was chosen for several reasons:
+共享 UI 包 (`packages/ui`) 的组件被 Next.js 应用 (`apps/web`, `apps/docs`) 直接使用。这是通过应用各自的 `next.config.js` 文件中的 `transpilePackages` 配置项实现的。这种设置简化了共享 Tailwind 配置，并确保样式被正确应用。
 
-- Make sharing one `tailwind.config.ts` to apps and packages as easy as possible.
-- Make package compilation simple by only depending on the Next.js Compiler and `tailwindcss`.
-- Ensure Tailwind classes do not overwrite each other. The `ui` package uses a `ui-` prefix for it's classes.
-- Maintain clear package export boundaries.
+### 工具集
 
-Another option is to consume `packages/ui` directly from source without building. If using this option, you will need to update the `tailwind.config.ts` in your apps to be aware of your package locations, so it can find all usages of the `tailwindcss` class names for CSS compilation.
+本项目预先配置了一些基础开发工具：
 
-For example, in [tailwind.config.ts](packages/tailwind-config/tailwind.config.ts):
+- [shadcn/ui](https://ui.shadcn.com/): 基于tailwindcss的现代化UI组件库。
+- [Tailwind CSS](https://tailwindcss.com/)：用于实现原子化 CSS 样式。
+- [TypeScript](https://www.typescriptlang.org/)：用于静态类型检查。
+- [ESLint](https://eslint.org/)：用于代码检查和强制代码风格。
+- [Prettier](https://prettier.io)：用于自动格式化代码。
 
-```js
-  content: [
-    // app content
-    `src/**/*.{js,ts,jsx,tsx}`,
-    // include packages if not transpiling
-    "../../packages/ui/*.{js,ts,jsx,tsx}",
-  ],
+## 项目路径别名说明
+
+为了方便模块导入和管理，本项目使用了一些路径别名：
+
+- `@repo/ui/...`: 指向 `packages/ui` 目录下的共享 UI 组件和工具函数。（例如：`@repo/ui/button`）
+- `@repo/typescript-config/...`: 指向 `packages/typescript-config` 目录下的 TypeScript 配置文件。
+- `@repo/eslint-config/...`: 指向 `packages/eslint-config` 目录下的 ESLint 配置文件。
+- `@/`: 在 `apps/web` 内部使用时，通常指向各自应用内部的根目录或 `src` 目录（具体配置请查看对应应用的 `tsconfig.json` 文件）。
+
+**重要提示:** 当你在 `apps/web` 中需要导入 `packages/ui` 中的模块时，请务必使用 `@repo/ui/...` 这个别名，而不是 `@/...`。例如，导入按钮组件应写为 `import { Button } from '@repo/ui/button';`。
+
+## 如何运行
+
+你可以在项目根目录下使用 `bun` 命令来运行和管理这个项目。
+
+例如，要启动 `web` 应用的开发服务器：
+
+```sh
+bun run dev --filter=web
 ```
 
-If you choose this strategy, you can remove the `tailwindcss` and `autoprefixer` dependencies from the `ui` package.
+要同时启动整个项目：
 
-### Utilities
+```sh
+bun run dev
+```
 
-This Turborepo has some additional tools already setup for you:
-
-- [Tailwind CSS](https://tailwindcss.com/) for styles
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+更多命令请参考 Turborepo 的官方文档。
