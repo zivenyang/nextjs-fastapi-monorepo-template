@@ -3,12 +3,18 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "concurrently \"bun run dev:web\" \"bun run dev:api\"",
+    "dev:web": "cd apps/web && bun run dev",
+    "dev:api": "cd apps/api && uv run fastapi dev",
+    "dev:clean": "rm -rf .turbo && rm -rf node_modules && rm -rf apps/*/node_modules",
+    "dev:install": "bun install",
+    "dev:reset": "bun run dev:clean && bun run dev:install",
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
+    "concurrently": "^9.1.2",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "turbo": "^2.5.0"

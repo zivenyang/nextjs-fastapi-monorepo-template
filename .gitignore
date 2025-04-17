@@ -34,3 +34,49 @@ yarn-error.log*
 
 # ui
 dist/
+
+# Python / uv / FastAPI specific
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments (common names including uv's default)
+.venv/
+virtualenv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+wheels/
+*.egg
+
+# Test & Coverage Reports
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+
+# Type checker cache
+.mypy_cache/
+.pytype/
+
+# Logs
+*.log
+
+# Local databases (e.g., for development)
+*.sqlite
+*.sqlite3
+
+# IDE specific (Uncomment if needed)
+# .idea/
+# .vscode/

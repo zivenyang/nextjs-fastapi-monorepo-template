@@ -10,6 +10,16 @@
 git clone https://github.com/zivenyang/nextjs-fastapi-template.git
 ```
 
+## 安装依赖 (Install Dependencies)
+
+在你克隆（clone）了项目代码之后，进入项目根目录，并运行以下命令来安装所有必需的依赖项：
+
+```sh
+bun install
+```
+
+这个命令会安装前端（Next.js, React, UI库等）和后端（如果未来添加，如FastAPI）以及开发时需要的所有工具。
+
 ## 项目包含什么？
 
 这个 Turborepo 项目包含了以下的包（packages）和应用（applications）：
@@ -53,13 +63,19 @@ git clone https://github.com/zivenyang/nextjs-fastapi-template.git
 
 你可以在项目根目录下使用 `bun` 命令来运行和管理这个项目。
 
-例如，要启动 `web` 应用的开发服务器：
+例如，要启动前端项目 `web`：
 
 ```sh
-bun run dev --filter=web
+bun run dev:web
 ```
 
-要同时启动整个项目：
+要启动后端项目 `api`:
+
+```sh
+bun run dev:api
+```
+
+要同时启动前后端项目：
 
 ```sh
 bun run dev
