@@ -77,6 +77,13 @@ coverage.xml
 *.sqlite
 *.sqlite3
 
+# Local env file    
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
 # IDE specific (Uncomment if needed)
 # .idea/
 # .vscode/

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine  # 使用较新的 Alpine 版本以减小体积
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: postgres       # 数据库用户名 (与 alembic.ini 和 .env 对应)
+      POSTGRES_PASSWORD: password # 数据库密码 (与 alembic.ini 和 .env 对应)
+      POSTGRES_DB: mydb         # 数据库名称 (与 alembic.ini 和 .env 对应)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # 将数据存储在命名卷中
+    ports:
+      - "5432:5432"           # 将容器的 5432 端口映射到主机的 5432 端口
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mydb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped     # 除非手动停止，否则总是尝试重启
+
+volumes:
+  postgres_data: # 定义命名卷，Docker 会管理它的存储位置
+    driver: local 
