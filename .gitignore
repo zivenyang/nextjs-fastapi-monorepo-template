@@ -71,6 +71,7 @@ coverage.xml
 .pytype/
 
 # Logs
+logs/
 *.log
 
 # Local databases (e.g., for development)

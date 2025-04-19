@@ -1,3 +1,4 @@
+from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
@@ -34,7 +35,7 @@ async def init_db():
         raise
 
 
-async def get_session() -> AsyncSession:
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """获取异步数据库会话"""
     async_session = sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
