@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     
     包含API和数据库配置项，使用环境变量和.env文件进行配置
     """
+    ENVIRONMENT: str = Field(..., description="环境类型")
     # API 设置
     API_V1_STR: str = Field("/api/v1", description="API版本前缀")
     PROJECT_NAME: str = Field("FastAPI Template", description="项目名称")
