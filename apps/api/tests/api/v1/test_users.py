@@ -1,7 +1,6 @@
 import pytest
 from httpx import AsyncClient
 from fastapi import status
-from uuid import UUID
 
 # 标记所有测试为异步和API测试
 pytestmark = [pytest.mark.asyncio, pytest.mark.api]

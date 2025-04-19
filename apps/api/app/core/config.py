@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     API_V1_STR: str = Field("/api/v1", description="API版本前缀")
     PROJECT_NAME: str = Field("FastAPI Template", description="项目名称")
     
+    # API 路径设置
+    AUTH_TOKEN_URL: str = Field("auth/login", description="认证令牌URL路径(不含API前缀)")
+    
     # CORS 设置
     BACKEND_CORS_ORIGINS: List[str] = Field(
         ["http://localhost:3000", "http://localhost:8000", "http://localhost"], 
@@ -97,6 +100,12 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore"
     )
+    
+    # 获取完整的TOKEN URL (包含API前缀)
+    @property
+    def FULL_AUTH_TOKEN_URL(self) -> str:
+        """返回包含API前缀的完整认证URL路径"""
+        return f"{self.API_V1_STR}/{self.AUTH_TOKEN_URL}"
 
 
 # 创建一个全局可用的 Settings 实例
@@ -112,6 +121,7 @@ DEBUG = settings.DEBUG
 if DEBUG:
     print(f"项目名称: {PROJECT_NAME}")
     print(f"API版本路径: {API_V1_STR}")
+    print(f"认证路径: {settings.FULL_AUTH_TOKEN_URL}")
     print(f"数据库URL: {settings.DATABASE_URL}")
     print(f"调试模式: {'开启' if DEBUG else '关闭'}")
     print(f"测试模式: {'开启' if settings.TESTING else '关闭'}")

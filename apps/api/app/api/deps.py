@@ -13,8 +13,8 @@ from app.core.db import get_session
 from app.models.user import User
 from app.schemas.token import TokenPayload
 
-# OAuth2 密码流认证令牌URL
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# OAuth2 密码流认证令牌URL - 使用配置中的值
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=settings.FULL_AUTH_TOKEN_URL)
 
 # 数据库会话依赖
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
