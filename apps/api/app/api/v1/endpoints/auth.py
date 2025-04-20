@@ -1,18 +1,19 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user
 from app.core.config import settings
-from app.core.security import create_access_token, get_password_hash, verify_password
+from app.core.security import create_access_token, get_password_hash, verify_password, decode_jwt_token
 from app.models.user import User
-from app.schemas.token import Token
+from app.schemas.auth import Token
 from app.schemas.user import UserCreate, UserResponse
 from app.core.logging import get_logger
+from app.core.token_blacklist import logout_tokens, cleanup_expired_tokens  # 从单独的模块导入
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
@@ -61,6 +62,9 @@ async def login_access_token(
                 detail="用户未激活"
             )
         
+        # 清理过期的登出令牌
+        cleanup_expired_tokens()
+        
         # 创建访问令牌
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         token = create_access_token(
@@ -78,6 +82,62 @@ async def login_access_token(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="登录过程中发生错误"
+        )
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(
+    authorization: str = Header(...),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    用户登出，将当前令牌加入黑名单
+    """
+    try:
+        # 从授权头中提取令牌
+        token_type, token = authorization.split()
+        if token_type.lower() != "bearer":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="无效的认证类型",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            
+        # 解码令牌以获取其到期时间和唯一标识符
+        token_data = decode_jwt_token(token)
+        if not token_data:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="无效的令牌",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            
+        # 获取令牌的有效期和标识
+        jti = token_data.get("jti") or str(current_user.id)  # 使用用户ID作为备用标识
+        exp = token_data.get("exp")
+        
+        if not exp:
+            # 如果无法获取过期时间，使用当前时间加上默认过期时间
+            exp_time = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        else:
+            exp_time = datetime.fromtimestamp(exp)
+            
+        # 将令牌添加到黑名单
+        logout_tokens[jti] = exp_time
+        
+        # 清理过期的登出令牌
+        cleanup_expired_tokens()
+        
+        logger.info(f"用户 {current_user.id} ({current_user.email}) 登出成功")
+        return {"detail": "登出成功"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"处理登出请求时发生错误: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="登出过程中发生错误"
         )
 
 

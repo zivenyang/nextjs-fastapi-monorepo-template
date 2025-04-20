@@ -22,12 +22,14 @@ class TokenPayload(BaseModel):
     """JWT令牌载荷模型"""
     sub: Optional[UUID] = Field(None, description="主题（用户ID）")
     exp: Optional[int] = Field(None, description="过期时间")
+    jti: Optional[str] = Field(None, description="JWT令牌ID，用于标识唯一的令牌")
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "sub": "123e4567-e89b-12d3-a456-426614174000",
-                "exp": 1645556823
+                "exp": 1645556823,
+                "jti": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
             }
         }
     ) 

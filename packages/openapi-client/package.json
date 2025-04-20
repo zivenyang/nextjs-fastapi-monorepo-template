@@ -1,0 +1,21 @@
+{
+    "name": "@repo/openapi-client",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "gen": "openapi-ts"
+    },
+    "exports": {
+        "./sdk": "./src/client/index.ts",
+        "./client": "./src/client/client.gen.ts"
+    },
+    "devDependencies": {
+        "@hey-api/openapi-ts": "^0.66.5",
+        "@repo/typescript-config": "*",
+        "@repo/eslint-config": "*",
+        "typescript": "^5.8.2"
+    },
+    "dependencies": {
+        "@hey-api/client-next": "^0.3.0"
+    }
+}

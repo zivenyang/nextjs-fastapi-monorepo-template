@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # API 设置
     API_V1_STR: str = Field("/api/v1", description="API版本前缀")
     PROJECT_NAME: str = Field("FastAPI Template", description="项目名称")
+    PROJECT_DESCRIPTION: str = Field("一个基于FastAPI的Web API模板", description="项目描述")
+    OPENAPI_OUTPUT_FILE: str = Field("../../packages/openapi-client/openapi.json", description="openapi文件生成路径")
+    OPENAPI_URL: str = Field("/openapi.json", description="openapi文件URL路径")
     
     # API 路径设置
     AUTH_TOKEN_URL: str = Field("auth/login", description="认证令牌URL路径(不含API前缀)")

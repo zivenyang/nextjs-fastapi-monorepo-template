@@ -28,6 +28,21 @@ def token_headers(test_user: User) -> Dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
 
 @pytest.fixture(scope="function")
+def test_user_token(test_user: User) -> str:
+    """
+    获取测试用户的访问令牌（仅令牌字符串）。
+    
+    为测试用户创建JWT访问令牌，并返回令牌字符串。
+    
+    Args:
+        test_user: 测试用户fixture
+        
+    Returns:
+        str: 访问令牌字符串
+    """
+    return create_access_token(subject=str(test_user.id))
+
+@pytest.fixture(scope="function")
 def superuser_token_headers(test_superuser: User) -> Dict[str, str]:
     """
     获取带有超级用户令牌的认证头。

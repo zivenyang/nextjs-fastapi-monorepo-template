@@ -1,84 +1,133 @@
-# Turborepo Tailwind CSS 入门模板
+# Next.js + FastAPI 全栈应用模板
 
-这个 Turborepo 入门模板由 Turborepo 核心团队维护。它提供了一个基础配置，用于构建使用 Next.js、Tailwind CSS 和共享 UI 组件的 Web 应用。
+这是一个基于 Turborepo 构建的现代全栈应用模板，提供了完整的前后端开发环境和基础功能。
 
-## 如何使用这个模板
+## 项目技术栈
 
-要基于此模板创建一个新项目，请运行以下命令：
+### 前端
+- **Next.js 14**: 使用 App Router 构建的 React 框架
+- **TailwindCSS**: 用于样式设计
+- **Shadcn/UI**: 基于 Tailwind 的高质量UI组件库
+- **TypeScript**: 提供类型安全
+- **Server Actions**: 用于处理表单提交和认证
 
-```sh
-git clone https://github.com/zivenyang/nextjs-fastapi-template.git
+### 后端
+- **FastAPI**: 高性能Python API框架
+- **SQLModel**: 结合了SQLAlchemy和Pydantic的ORM
+- **PostgreSQL**: 关系型数据库
+- **Alembic**: 数据库迁移工具
+- **JWT**: 用于认证
+
+## 项目结构
+
+```
+/
+├── apps
+│   ├── api/                  # FastAPI 后端应用
+│   │   ├── app/              # API应用代码
+│   │   │   ├── api/          # API路由
+│   │   │   ├── core/         # 核心配置、中间件等
+│   │   │   ├── models/       # 数据库模型
+│   │   │   ├── schemas/      # Pydantic模式
+│   │   │   └── services/     # 业务逻辑服务
+│   │   └── ...
+│   └── web/                  # Next.js 前端应用
+│       ├── app/              # Next.js App Router
+│       ├── components/       # UI组件
+│       ├── lib/              # 工具函数和类型
+│       └── ...
+├── packages
+│   ├── ui/                   # 共享UI组件库
+│   ├── openapi-client/       # 自动生成的API客户端
+│   └── ...
+└── ...
 ```
 
-## 安装依赖 (Install Dependencies)
+## 主要功能
 
-在你克隆（clone）了项目代码之后，进入项目根目录，并运行以下命令来安装所有必需的依赖项：
+### 1. 用户认证系统
+- 完整的用户注册和登录流程
+- 基于JWT的认证
+- 令牌管理（包括登出黑名单）
+- 用户角色和权限管理
 
-```sh
-bun install
+### 2. 数据库集成
+- 使用SQLModel的模型定义
+- 异步数据库操作
+- 数据库迁移支持
+
+### 3. API开发
+- 结构化的API路由组织
+- 请求验证
+- 错误处理和日志记录
+- CORS支持
+- OpenAPI文档生成
+
+### 4. 前端特性
+- 现代化React组件设计
+- 服务端组件和Server Actions
+- 响应式布局
+- 表单验证
+- 主题支持
+
+## 快速开始
+
+### 安装依赖
+```bash
+# 安装所有工作区依赖
+npm install
 ```
 
-这个命令会安装前端（Next.js, React, UI库等）和后端（如果未来添加，如FastAPI）以及开发时需要的所有工具。
+### 环境设置
+1. 复制`.env.example`到`.env`（在api和web目录中）
+2. 按需修改配置
 
-## 项目包含什么？
+### 数据库设置
+```bash
+# 创建数据库
+npm run db:create
 
-这个 Turborepo 项目包含了以下的包（packages）和应用（applications）：
-
-### 应用和包
-
-- `apps/docs`: 一个 [Next.js](https://nextjs.org/) 应用（例如，用于文档）。
-- `apps/web`: 另一个 [Next.js](https://nextjs.org/) 应用（例如，主要的 Web 应用）。
-- `packages/ui`: 一个共享的 React 组件库，使用了 [Tailwind CSS](https://tailwindcss.com/) & [shadcn/ui](https://ui.shadcn.com/)。这里的组件可以被多个应用共用。
-- `packages/eslint-config`: 共享的 [ESLint](https://eslint.org/) 配置。
-- `packages/typescript-config`: 在整个 monorepo 中使用的共享 `tsconfig.json` 配置。
-
-所有的包和应用都是用 [TypeScript](https://www.typescriptlang.org/) 编写的。
-
-### 构建 `packages/ui`
-
-共享 UI 包 (`packages/ui`) 的组件被 Next.js 应用 (`apps/web`, `apps/docs`) 直接使用。这是通过应用各自的 `next.config.js` 文件中的 `transpilePackages` 配置项实现的。这种设置简化了共享 Tailwind 配置，并确保样式被正确应用。
-
-### 工具集
-
-本项目预先配置了一些基础开发工具：
-
-- [shadcn/ui](https://ui.shadcn.com/): 基于tailwindcss的现代化UI组件库。
-- [Tailwind CSS](https://tailwindcss.com/)：用于实现原子化 CSS 样式。
-- [TypeScript](https://www.typescriptlang.org/)：用于静态类型检查。
-- [ESLint](https://eslint.org/)：用于代码检查和强制代码风格。
-- [Prettier](https://prettier.io)：用于自动格式化代码。
-
-## 项目路径别名说明
-
-为了方便模块导入和管理，本项目使用了一些路径别名：
-
-- `@repo/ui/...`: 指向 `packages/ui` 目录下的共享 UI 组件和工具函数。（例如：`@repo/ui/button`）
-- `@repo/typescript-config/...`: 指向 `packages/typescript-config` 目录下的 TypeScript 配置文件。
-- `@repo/eslint-config/...`: 指向 `packages/eslint-config` 目录下的 ESLint 配置文件。
-- `@/`: 在 `apps/web` 内部使用时，通常指向各自应用内部的根目录或 `src` 目录（具体配置请查看对应应用的 `tsconfig.json` 文件）。
-
-**重要提示:** 当你在 `apps/web` 中需要导入 `packages/ui` 中的模块时，请务必使用 `@repo/ui/...` 这个别名，而不是 `@/...`。例如，导入按钮组件应写为 `import { Button } from '@repo/ui/button';`。
-
-## 如何运行
-
-你可以在项目根目录下使用 `bun` 命令来运行和管理这个项目。
-
-例如，要启动前端项目 `web`：
-
-```sh
-bun run dev:web
+# 运行迁移
+npm run db:migrate
 ```
 
-要启动后端项目 `api`:
-
-```sh
-bun run dev:api
+### 启动开发服务器
+```bash
+# 启动所有应用（前端+后端）
+npm run dev
 ```
 
-要同时启动前后端项目：
+## API端点
 
-```sh
-bun run dev
-```
+### 认证API
+- `POST /api/v1/auth/register` - 用户注册
+- `POST /api/v1/auth/login` - 用户登录
+- `POST /api/v1/auth/logout` - 用户登出
 
-更多命令请参考 Turborepo 的官方文档。
+### 用户API
+- `GET /api/v1/users/me` - 获取当前用户信息
+- `GET /api/v1/users/{user_id}` - 获取特定用户
+- `GET /api/v1/users/` - 获取用户列表（管理员）
+
+## 项目规范
+
+- 使用TypeScript类型安全
+- 遵循RESTful API设计原则
+- 使用Pydantic进行数据验证
+- 完整的错误处理和日志记录
+- 统一的代码风格和格式
+
+## 扩展方向
+
+- 添加更多身份验证方法（OAuth、社交登录等）
+- 实现更多业务模块（如内容管理、支付集成等）
+- 添加测试覆盖率
+- 部署到云服务（提供Docker支持）
+
+## 贡献
+
+欢迎提交Pull Request和报告问题。
+
+## 许可
+
+MIT

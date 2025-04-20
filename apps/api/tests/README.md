@@ -6,12 +6,21 @@
 
 ```
 tests/
-├── conftest.py            # 测试配置和 fixtures
-├── test_db.py             # 数据库功能测试
-└── api/
-    └── v1/
-        ├── test_auth.py   # 认证API测试
-        └── test_users.py  # 用户API测试
+├── conftest.py                   # 测试配置和全局 fixtures
+├── fixtures/                     # 测试数据和辅助功能
+│   ├── __init__.py              # fixtures导出
+│   ├── auth.py                  # 认证相关的fixtures
+│   ├── database.py              # 数据库相关的fixtures
+│   ├── http_client.py           # HTTP客户端fixtures
+│   └── users.py                 # 用户测试数据fixtures
+├── test_db.py                   # 数据库功能测试
+├── api/
+│   └── v1/
+│       ├── test_auth.py         # 认证API测试
+│       ├── test_auth_logout.py  # 登出API测试
+│       └── test_users.py        # 用户API测试
+└── core/
+    └── test_token_blacklist.py  # 令牌黑名单单元测试
 ```
 
 ## 环境配置系统
@@ -73,6 +82,12 @@ pytest
 # 运行认证测试
 pytest tests/api/v1/test_auth.py
 
+# 运行登出功能测试
+pytest tests/api/v1/test_auth_logout.py
+
+# 运行令牌黑名单单元测试
+pytest tests/core/test_token_blacklist.py
+
 # 运行用户API测试
 pytest tests/api/v1/test_users.py
 
@@ -100,6 +115,7 @@ pytest -m "not slow"
 
 1. **API 测试**：测试 FastAPI 接口功能，包括：
    - 认证 (登录/注册)
+   - 登出功能（令牌黑名单）
    - 用户管理 (获取用户信息、列表)
    - 权限控制
 
@@ -107,6 +123,32 @@ pytest -m "not slow"
    - 创建和查询用户
    - 用户角色枚举
    - 自动时间戳字段
+
+3. **核心功能测试**：测试系统核心组件，包括：
+   - 令牌黑名单功能（添加令牌、清理过期令牌）
+   - 安全组件（密码验证、令牌生成与解码）
+
+## 特定功能测试说明
+
+### 令牌黑名单测试
+
+`token_blacklist.py` 模块是实现登出功能的核心，通过将已登出的令牌存储在内存字典中实现。测试内容包括：
+
+- 测试黑名单字典初始化
+- 向黑名单添加令牌
+- 清理过期令牌功能
+- 处理多个过期令牌
+- 令牌过期检查逻辑
+
+### 登出API测试
+
+登出API端点测试验证用户成功登出的功能，包括：
+
+- 测试成功登出
+- 测试使用无效令牌登出
+- 测试没有提供令牌的情况
+- 测试使用错误令牌类型
+- 测试多次登出同一令牌
 
 ## 测试设计说明
 

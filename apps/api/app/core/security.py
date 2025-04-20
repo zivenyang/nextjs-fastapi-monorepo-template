@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Union, Optional
+from typing import Any, Union, Optional, Dict
+import uuid
 
-from jose import jwt
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -28,8 +29,15 @@ def create_access_token(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
     
-    to_encode = {"exp": expire, "sub": str(subject)}
-    logger.debug(f"创建JWT令牌 (subject: {subject}, expires: {expire.isoformat()})")
+    # 生成一个唯一标识符，用于标识令牌
+    token_jti = str(uuid.uuid4())
+    
+    to_encode = {
+        "exp": expire, 
+        "sub": str(subject),
+        "jti": token_jti  # 添加令牌唯一标识符
+    }
+    logger.debug(f"创建JWT令牌 (subject: {subject}, jti: {token_jti}, expires: {expire.isoformat()})")
     
     try:
         encoded_jwt = jwt.encode(
@@ -40,6 +48,26 @@ def create_access_token(
     except Exception as e:
         logger.error(f"JWT令牌创建失败: {str(e)}", exc_info=True)
         raise
+
+
+def decode_jwt_token(token: str) -> Optional[Dict[str, Any]]:
+    """
+    解码JWT令牌，获取其内容
+    """
+    try:
+        payload = jwt.decode(
+            token, 
+            settings.SECRET_KEY, 
+            algorithms=[settings.ALGORITHM]
+        )
+        logger.debug(f"JWT令牌解码成功")
+        return payload
+    except JWTError as e:
+        logger.warning(f"JWT令牌解码失败: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"JWT令牌解码过程中发生错误: {str(e)}", exc_info=True)
+        return None
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

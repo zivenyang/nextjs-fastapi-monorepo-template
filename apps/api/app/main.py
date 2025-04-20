@@ -1,9 +1,9 @@
 from fastapi import FastAPI
+from fastapi.routing import APIRoute
 import uvicorn
 from app.core.db import init_db
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-import logging
 
 from app.api.v1 import api_router
 from app.core.config import settings
@@ -26,10 +26,15 @@ async def lifespan(app: FastAPI):
     # 这里可以添加清理代码
     logger.info("应用已正常关闭")
 
+def custom_generate_unique_id(route: APIRoute) -> str:
+    return f"{route.tags[0]}-{route.name}"
+
 app = FastAPI(
     title=settings.PROJECT_NAME, 
-    description="一个基于FastAPI的Web API模板",
-    lifespan=lifespan
+    description=settings.PROJECT_DESCRIPTION,
+    lifespan=lifespan,
+    generate_unique_id_function=custom_generate_unique_id,
+    openapi_url=settings.OPENAPI_URL,
 )
 
 # 配置CORS
@@ -48,10 +53,10 @@ setup_middlewares(app)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 logger.info(f"API路由已注册，前缀: {settings.API_V1_STR}")
 
-@app.get("/")
-def read_root():
-    logger.debug("访问根路径")
-    return {"message": "Hello World", "docs_url": "/docs"}
+# @app.get("/")
+# def read_root():
+#     logger.debug("访问根路径")
+#     return {"message": "Hello World", "docs_url": "/docs"}
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
-from typing import Optional, Annotated
+from typing import Optional, Annotated, List, Dict, Any
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator
+from datetime import datetime
 
 from app.models.user import UserRole
 
@@ -12,6 +13,8 @@ class UserBase(BaseModel):
     full_name: Optional[str] = Field(None, description="用户全名")
     is_active: Optional[bool] = Field(True, description="用户是否激活")
     role: Optional[UserRole] = Field(None, description="用户角色")
+    is_superuser: Optional[bool] = Field(None, description="是否为超级用户")
+    is_verified: Optional[bool] = Field(None, description="邮箱是否已验证")
     
 
 class UserCreate(UserBase):
@@ -30,10 +33,31 @@ class UserCreate(UserBase):
         }
     )
 
+    @model_validator(mode="after")
+    def set_username_if_empty(self) -> "UserCreate":
+        """如果未提供用户名，则使用邮箱前缀作为用户名"""
+        if not self.username and self.email:
+            self.username = self.email.split("@")[0]
+        return self
+
+
+class UserProfileBase(BaseModel):
+    """用户资料基本信息"""
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+
+
+class UserProfileUpdate(UserProfileBase):
+    """用户资料更新模式"""
+    pass
+
 
 class UserUpdate(UserBase):
     """用户更新数据模型"""
     password: Optional[str] = Field(None, min_length=8, description="用户密码（如需更新）")
+    profile: Optional[UserProfileUpdate] = None
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -46,11 +70,23 @@ class UserUpdate(UserBase):
     )
 
 
+class UserProfileResponse(UserProfileBase):
+    """用户资料响应模式"""
+    id: UUID
+    user_id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UserResponse(UserBase):
     """API响应中的用户数据模型"""
     id: UUID = Field(..., description="用户ID")
-    is_superuser: bool = Field(..., description="是否为超级用户")
-    is_verified: bool = Field(..., description="邮箱是否已验证")
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
+    profile: Optional[UserProfileResponse] = None
     
     model_config = ConfigDict(
         from_attributes=True,

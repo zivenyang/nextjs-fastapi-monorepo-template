@@ -11,8 +11,9 @@ from sqlmodel import select
 from app.core.config import settings
 from app.core.db import get_session
 from app.models.user import User
-from app.schemas.token import TokenPayload
+from app.schemas.auth import TokenPayload
 from app.core.logging import get_logger
+from app.core.token_blacklist import logout_tokens  # 从正确的模块导入
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
@@ -57,6 +58,17 @@ async def get_current_user(
                 detail="无效的令牌",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+            
+        # 检查令牌是否在黑名单中
+        jti = token_data.jti or str(token_data.sub)
+        if jti in logout_tokens:
+            logger.warning(f"令牌在黑名单中: {jti}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="令牌已失效，请重新登录",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
         user_id: UUID = token_data.sub
         logger.debug(f"令牌验证成功，用户ID: {user_id}")
     except JWTError as e:
