@@ -1,4 +1,4 @@
-# Next.js + FastAPI 全栈应用模板
+# Next.js + FastAPI + Monorepo 全栈应用模板
 
 这是一个基于 Turborepo 构建的现代全栈应用模板，提供了完整的前后端开发环境和基础功能。
 
