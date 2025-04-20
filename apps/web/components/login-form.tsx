@@ -13,12 +13,12 @@ import {
 import { Input } from "@repo/ui/components/input"
 import { Label } from "@repo/ui/components/label"
 import { login } from "@/actions/auth"
-import { useActionState, useEffect } from "react"
+import { useActionState } from "react"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@repo/ui/components/alert"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useAuth } from "./auth-provider";
 
 export function LoginForm({
@@ -28,23 +28,39 @@ export function LoginForm({
   const router = useRouter();
   const { setAuth } = useAuth();
   const [isPending, setIsPending] = useState(false);
+  const formSubmitRef = useRef(false);
   const [state, formAction] = useActionState(login, {
     error: null,
     success: false,
   });
 
-  const handleSubmit = (formData: FormData) => {
+  const handleAction = async (formData: FormData) => {
     setIsPending(true);
-    formAction(formData);
-    setIsPending(false);
+    formSubmitRef.current = true;
+    try {
+      await formAction(formData);
+    } catch (error) {
+      console.error("表单提交错误:", error);
+      setIsPending(false);
+    }
+  };
+
+  const handleRegisterClick = () => {
+    router.push("/register");
   };
 
   useEffect(() => {
-    if (state.success) {
-      setAuth(true);
-      router.push("/");
+    if (formSubmitRef.current) {
+      formSubmitRef.current = false;
+      
+      if (state.success) {
+        setAuth(true);
+        router.push("/");
+      }
+      
+      setIsPending(false);
     }
-  }, [state.success, router, setAuth]);
+  }, [state, router, setAuth]);
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -56,7 +72,7 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={formAction}>
+          <form action={handleAction}>
             <div className="flex flex-col gap-6">
               {state.error && (
                 <Alert variant="destructive">
@@ -73,6 +89,7 @@ export function LoginForm({
                   placeholder="your@email.com"
                   required
                   disabled={isPending}
+                  autoComplete="email"
                 />
               </div>
               <div className="grid gap-2">
@@ -91,6 +108,7 @@ export function LoginForm({
                   type="password" 
                   required 
                   disabled={isPending}
+                  autoComplete="current-password"
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isPending}>
@@ -102,9 +120,13 @@ export function LoginForm({
         <CardFooter className="flex flex-col">
           <div className="mt-4 text-center text-sm">
             还没有账号?{" "}
-            <Link href="/register" className="underline underline-offset-4">
+            <Button 
+              variant="link" 
+              className="p-0 h-auto font-normal underline underline-offset-4"
+              onClick={handleRegisterClick}
+            >
               注册
-            </Link>
+            </Button>
           </div>
         </CardFooter>
       </Card>
