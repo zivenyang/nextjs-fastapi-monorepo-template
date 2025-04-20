@@ -8,7 +8,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { checkUserPermission } from "@/actions/user";
 
 export function NavBar() {
-  const { isAuthenticated, logout, loading } = useAuth();
+  const { isAuthenticated, logout, isPending } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -78,9 +78,9 @@ export function NavBar() {
             <Button
               variant="outline"
               onClick={logout}
-              disabled={loading}
+              disabled={isPending}
             >
-              {loading ? "登出中..." : "登出"}
+              {isPending ? "登出中..." : "登出"}
             </Button>
           ) : (
             <>

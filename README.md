@@ -1,132 +1,107 @@
-# Next.js + FastAPI + Monorepo 全栈应用模板
+# Next.js FastAPI Monorepo模板
 
-这是一个基于 Turborepo 构建的现代全栈应用模板，提供了完整的前后端开发环境和基础功能。
+## 项目简介
 
-## 项目技术栈
+这是一个基于Next.js和FastAPI的全栈应用模板，使用Turborepo管理monorepo结构。该项目提供了现代化的Web应用开发基础，包括身份验证、数据库集成和UI组件库。
 
-### 前端
-- **Next.js 14**: 使用 App Router 构建的 React 框架
-- **TailwindCSS**: 用于样式设计
-- **Shadcn/UI**: 基于 Tailwind 的高质量UI组件库
-- **TypeScript**: 提供类型安全
-- **Server Actions**: 用于处理表单提交和认证
+## 项目架构
 
-### 后端
-- **FastAPI**: 高性能Python API框架
-- **SQLModel**: 结合了SQLAlchemy和Pydantic的ORM
-- **PostgreSQL**: 关系型数据库
-- **Alembic**: 数据库迁移工具
-- **JWT**: 用于认证
-
-## 项目结构
+项目采用monorepo结构，主要包含以下部分：
 
 ```
-/
-├── apps
-│   ├── api/                  # FastAPI 后端应用
-│   │   ├── app/              # API应用代码
-│   │   │   ├── api/          # API路由
-│   │   │   ├── core/         # 核心配置、中间件等
-│   │   │   ├── models/       # 数据库模型
-│   │   │   ├── schemas/      # Pydantic模式
-│   │   │   └── services/     # 业务逻辑服务
-│   │   └── ...
-│   └── web/                  # Next.js 前端应用
-│       ├── app/              # Next.js App Router
-│       ├── components/       # UI组件
-│       ├── lib/              # 工具函数和类型
-│       └── ...
-├── packages
-│   ├── ui/                   # 共享UI组件库
-│   ├── openapi-client/       # 自动生成的API客户端
-│   └── ...
-└── ...
+.
+├── apps/
+│   ├── web/       # Next.js前端应用
+│   └── api/       # FastAPI后端应用
+└── packages/      # 共享包
+    ├── ui/        # UI组件库
+    ├── eslint/    # ESLint配置
+    └── tsconfig/  # TypeScript配置
 ```
 
-## 主要功能
+### 前端架构 (Next.js)
 
-### 1. 用户认证系统
-- 完整的用户注册和登录流程
-- 基于JWT的认证
-- 令牌管理（包括登出黑名单）
-- 用户角色和权限管理
+前端采用Next.js框架，具有以下特点：
 
-### 2. 数据库集成
-- 使用SQLModel的模型定义
-- 异步数据库操作
-- 数据库迁移支持
+- 基于React，支持服务器端渲染(SSR)和静态生成(SSG)
+- 使用App Router结构进行路由管理
+- 通过Server Actions进行服务器端操作
+- 使用Context API进行状态管理
 
-### 3. API开发
-- 结构化的API路由组织
-- 请求验证
-- 错误处理和日志记录
-- CORS支持
-- OpenAPI文档生成
+### 后端架构 (FastAPI)
 
-### 4. 前端特性
-- 现代化React组件设计
-- 服务端组件和Server Actions
-- 响应式布局
-- 表单验证
-- 主题支持
+后端采用FastAPI框架，具有以下特点：
+
+- 高性能的Python API框架
+- 自动生成OpenAPI文档
+- SQLModel用于数据库ORM
+- JWT认证机制
+
+## 认证系统
+
+项目实现了完整的JWT认证系统：
+
+### 前端认证流程
+
+1. 用户登录时，前端发送凭据到后端
+2. 后端验证凭据并返回JWT令牌
+3. 前端将令牌存储在HTTP-only cookie中
+4. 使用React Context管理身份验证状态
+5. 定期检查认证状态以确保同步
+
+### 后端认证流程
+
+1. 实现JWT令牌创建和验证
+2. 维护令牌黑名单用于处理登出操作
+3. 使用依赖项注入确保API端点的安全访问
+
+## 优化方案
+
+根据React 19和Next.js 15的新特性，以下是对认证系统的优化建议：
+
+1. 使用React 19的useActionState代替useState和useEffect组合
+2. 利用Next.js 15的服务器动作进行认证操作
+3. 简化Context API的使用，减少不必要的重渲染
+4. 使用React 19的useOptimistic提升UI响应速度
+5. 利用React Server Components减少客户端JavaScript体积
 
 ## 快速开始
 
 ### 安装依赖
+
 ```bash
-# 安装所有工作区依赖
 npm install
 ```
 
-### 环境设置
-1. 复制`.env.example`到`.env`（在api和web目录中）
-2. 按需修改配置
+### 运行开发环境
 
-### 数据库设置
 ```bash
-# 创建数据库
-npm run db:create
-
-# 运行迁移
-npm run db:migrate
-```
-
-### 启动开发服务器
-```bash
-# 启动所有应用（前端+后端）
 npm run dev
 ```
 
-## API端点
+### 构建生产环境
 
-### 认证API
-- `POST /api/v1/auth/register` - 用户注册
-- `POST /api/v1/auth/login` - 用户登录
-- `POST /api/v1/auth/logout` - 用户登出
+```bash
+npm run build
+```
 
-### 用户API
-- `GET /api/v1/users/me` - 获取当前用户信息
-- `GET /api/v1/users/{user_id}` - 获取特定用户
-- `GET /api/v1/users/` - 获取用户列表（管理员）
+## 文件结构说明
 
-## 项目规范
+### 前端关键文件
 
-- 使用TypeScript类型安全
-- 遵循RESTful API设计原则
-- 使用Pydantic进行数据验证
-- 完整的错误处理和日志记录
-- 统一的代码风格和格式
+- `apps/web/contexts/auth.context.tsx`: 认证上下文管理
+- `apps/web/components/auth/login-form.tsx`: 登录表单组件
+- `apps/web/actions/auth/index.ts`: 认证相关的服务器动作
 
-## 扩展方向
+### 后端关键文件
 
-- 添加更多身份验证方法（OAuth、社交登录等）
-- 实现更多业务模块（如内容管理、支付集成等）
-- 添加测试覆盖率
-- 部署到云服务（提供Docker支持）
+- `apps/api/app/api/v1/endpoints/auth.py`: 认证相关API端点
+- `apps/api/app/core/security.py`: 安全相关功能
+- `apps/api/app/api/deps.py`: API依赖项（包括认证）
 
 ## 贡献
 
-欢迎提交Pull Request和报告问题。
+欢迎提交问题和拉取请求来改进项目。
 
 ## 许可
 

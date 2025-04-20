@@ -18,7 +18,7 @@ import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@repo/ui/components/alert"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth.context";
 import type { AuthActionState } from "@/types";
 
@@ -29,39 +29,36 @@ export function LoginForm({
   const router = useRouter();
   const { setAuth } = useAuth();
   const [isPending, setIsPending] = useState(false);
-  const formSubmitRef = useRef(false);
+  
+  // 使用useActionState处理表单提交和状态管理
   const [state, formAction] = useActionState(login, {
     error: null,
     success: false,
   } as AuthActionState);
 
-  const handleAction = async (formData: FormData) => {
+  // 表单提交处理
+  const handleSubmit = async (formData: FormData) => {
     setIsPending(true);
-    formSubmitRef.current = true;
     try {
       await formAction(formData);
     } catch (error) {
       console.error("表单提交错误:", error);
+    } finally {
       setIsPending(false);
     }
   };
+
+  // 登录成功后的处理
+  useEffect(() => {
+    if (state.success) {
+      setAuth(true);
+      router.push("/");
+    }
+  }, [state.success, router, setAuth]);
 
   const handleRegisterClick = () => {
     router.push("/register");
   };
-
-  useEffect(() => {
-    if (formSubmitRef.current) {
-      formSubmitRef.current = false;
-      
-      if (state.success) {
-        setAuth(true);
-        router.push("/");
-      }
-      
-      setIsPending(false);
-    }
-  }, [state, router, setAuth]);
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -73,7 +70,7 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={handleAction}>
+          <form action={handleSubmit}>
             <div className="flex flex-col gap-6">
               {state.error && (
                 <Alert variant="destructive">

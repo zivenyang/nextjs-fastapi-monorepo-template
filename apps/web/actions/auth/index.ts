@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { loginAccessToken, registerUser, logout as apiLogout } from "@/openapi/sdk";
 import { loginSchema, registerSchema } from "@/schemas/auth";
 import type { AuthActionState } from "@/types/auth";
@@ -119,8 +120,7 @@ export async function register(
 export async function logout() {
   try {
     // 获取token
-    const cookieStore = await cookies();
-    const token = cookieStore.get("auth-token")?.value;
+    const token = (await cookies()).get("auth-token")?.value;
 
     if (token) {
       // 调用API登出
@@ -135,8 +135,9 @@ export async function logout() {
     // 即使API调用失败，我们仍然需要清除cookie
   } finally {
     // 无论API调用成功与否，都移除本地token
-    const cookieStore = await cookies();
-    cookieStore.delete("auth-token");
+    (await
+          // 无论API调用成功与否，都移除本地token
+          cookies()).delete("auth-token");
     
     // 重定向到登录页面
     redirect("/login");
@@ -144,16 +145,28 @@ export async function logout() {
 }
 
 /**
- * 检查认证状态
+ * 检查认证状态（使用cache优化性能）
  * 用于服务器端组件判断用户是否已登录
  */
-export async function checkAuthStatus(): Promise<boolean> {
+export const checkAuthStatus = cache(async (): Promise<boolean> => {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("auth-token")?.value;
+    const token = (await cookies()).get("auth-token")?.value;
     return !!token;
   } catch (error) {
     console.error("检查认证状态失败:", error);
     return false;
   }
-} 
+});
+
+/**
+ * 获取认证Token
+ * 用于API请求
+ */
+export const getAuthToken = cache(async (): Promise<string | null> => {
+  try {
+    return (await cookies()).get("auth-token")?.value || null;
+  } catch (error) {
+    console.error("获取认证Token失败:", error);
+    return null;
+  }
+}); 
