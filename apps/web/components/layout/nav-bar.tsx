@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@repo/ui/components/button";
-import { useAuth } from "./auth-provider";
+import { useAuth } from "@/contexts/auth.context";
 import { useRouter } from "next/navigation";
 
 export function NavBar() {

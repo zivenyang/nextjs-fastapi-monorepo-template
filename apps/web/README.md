@@ -136,3 +136,122 @@ bun run dev
 
 - [Next.js文档](https://nextjs.org/docs) - 了解Next.js的特性和API
 - [学习Next.js](https://nextjs.org/learn) - 一个交互式的Next.js教程
+
+# Next.js 前端应用
+
+这是一个基于Next.js 15构建的现代化前端应用，采用了最新的React Server Components和Server Actions架构。
+
+## 项目结构
+
+```
+/app                  # Next.js App Router路由和页面
+  /api                # API路由处理程序
+  /login              # 登录页面
+  /register           # 注册页面
+  /profile            # 用户个人资料页面
+  layout.tsx          # 根布局组件
+  page.tsx            # 首页组件
+
+/actions              # 服务器操作 (Server Actions)
+  /auth               # 认证相关的服务器操作
+    index.ts          # 主要认证动作 (登录、注册、登出等)
+    schemas.ts        # 验证模式导出
+    types.ts          # 类型定义导出
+
+/components           # 可复用UI组件
+  /auth               # 认证相关组件
+    index.ts          # 导出文件
+    login-form.tsx    # 登录表单组件
+    register-form.tsx # 注册表单组件
+  /layout             # 布局相关组件
+    index.ts          # 导出文件
+    nav-bar.tsx       # 导航栏组件
+  index.ts            # 主导出文件
+
+/contexts             # React上下文
+  index.ts            # 导出文件
+  auth.context.tsx    # 认证上下文
+  providers.tsx       # 上下文提供者组件
+  theme.context.tsx   # 主题上下文
+
+/lib                  # 工具函数和服务
+  validation.ts       # 表单验证工具
+
+/schemas              # 验证模式
+  index.ts            # 导出文件
+  auth.ts             # 认证相关验证模式
+
+/types                # 类型定义
+  index.ts            # 导出文件
+  auth.ts             # 认证相关类型
+  api.ts              # API相关类型
+
+/hooks                # 自定义React钩子
+```
+
+## 架构最佳实践
+
+### 1. Server vs Client 组件分离
+
+- 服务器组件位于`app/`目录下
+- 客户端组件使用`"use client"`指令标记，主要放在`components/`目录下
+- 清晰的职责分离，服务器组件负责数据获取和页面框架，客户端组件负责交互和状态管理
+
+### 2. 类型管理
+
+- 集中在`types/`目录下定义所有类型
+- 使用`index.ts`文件导出类型，简化导入
+- 按功能模块分组类型定义
+
+### 3. 验证模式
+
+- 使用Zod进行表单验证
+- 验证模式集中在`schemas/`目录下
+- 实现了类型安全的表单处理
+
+### 4. 服务器操作 (Server Actions)
+
+- 遵循Next.js 15的规则：`"use server"`文件只导出异步函数
+- 服务器操作集中在`actions/`目录下
+- 使用工具函数简化错误处理和状态创建
+
+### 5. 状态管理
+
+- 使用React Context API管理全局状态
+- 上下文提供者集中在`contexts/`目录下
+- 清晰的状态提供层次结构
+
+### 6. 目录和文件命名约定
+
+- 使用kebab-case命名组件文件
+- 使用camelCase命名工具和类型文件
+- 使用功能模块组织代码而不是技术角色
+
+## Next.js 15 最佳实践
+
+1. **Server Actions**：使用强类型和Server Actions进行表单处理，确保每个标记为"use server"的文件只导出异步函数
+
+2. **类型安全**：使用TypeScript和Zod实现端到端类型安全
+
+3. **模块组织**：按功能而非技术角色组织代码，提高可维护性
+
+4. **路径别名**：使用`@/`前缀的绝对导入路径，提高可读性
+
+5. **按需组件渲染**：根据需要选择服务器组件或客户端组件，优化性能和用户体验
+
+6. **统一的错误处理**：使用集中式错误处理和状态管理
+
+7. **单一职责组件**：组件设计遵循单一职责原则，提高复用性和可测试性
+
+## 开发和构建
+
+```bash
+# 开发环境运行
+npm run dev
+
+# 构建生产版本
+npm run build
+
+# 启动生产版本
+npm run start
+```

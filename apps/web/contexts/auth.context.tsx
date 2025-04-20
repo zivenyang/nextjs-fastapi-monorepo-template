@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
+// 认证上下文类型定义
 interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
@@ -10,8 +11,10 @@ interface AuthContextType {
   setAuth: (value: boolean) => void;
 }
 
+// 创建上下文
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// 导出自定义钩子供组件使用
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
@@ -25,6 +28,7 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
+// 认证上下文提供者组件
 export function AuthProvider({ initialAuth, children }: AuthProviderProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuth);
   const [loading, setLoading] = useState(false);

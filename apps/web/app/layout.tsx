@@ -2,8 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { checkAuthStatus } from "@/actions/auth"
 
 import "@repo/ui/globals.css"
-import { Providers } from "@/components/providers"
-import { AuthProvider } from "@/components/auth-provider"
+import { RootProviders } from "@/contexts/providers"
 
 const fontSans = Geist({
   subsets: ["latin"],
@@ -28,11 +27,9 @@ export default async function RootLayout({
       <body
         className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased `}
       >
-        <Providers>
-          <AuthProvider initialAuth={isAuthenticated}>
-            {children}
-          </AuthProvider>
-        </Providers>
+        <RootProviders initialAuth={isAuthenticated}>
+          {children}
+        </RootProviders>
       </body>
     </html>
   )

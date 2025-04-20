@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from "@repo/ui/components/alert";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
+import type { AuthActionState } from "@/types";
 
 export function RegisterForm({
   className,
@@ -30,7 +31,7 @@ export function RegisterForm({
   const [state, formAction] = useActionState(register, {
     error: null,
     success: false,
-  });
+  } as AuthActionState);
 
   // 在表单提交时设置loading状态
   const handleAction = async (formData: FormData) => {

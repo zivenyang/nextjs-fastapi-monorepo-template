@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { logout as apiLogout } from "@/api/sdk";
+import { logout as apiLogout } from "@/openapi/sdk";
 
 /**
  * 登出API端点

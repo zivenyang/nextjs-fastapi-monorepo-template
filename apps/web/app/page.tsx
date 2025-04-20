@@ -1,6 +1,6 @@
 import { Button } from "@repo/ui/components/button"
 import Link from "next/link"
-import { NavBar } from "@/components/nav-bar"
+import { NavBar } from "@/components/layout"
 
 export default function Page() {
   return (

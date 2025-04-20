@@ -1,4 +1,4 @@
-import { NavBar } from "@/components/nav-bar";
+import { NavBar } from "@/components/layout/nav-bar";
 import { checkAuthStatus } from "@/actions/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";

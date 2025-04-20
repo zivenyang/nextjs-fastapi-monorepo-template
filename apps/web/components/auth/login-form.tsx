@@ -19,7 +19,8 @@ import { Alert, AlertDescription } from "@repo/ui/components/alert"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
-import { useAuth } from "./auth-provider";
+import { useAuth } from "@/contexts/auth.context";
+import type { AuthActionState } from "@/types";
 
 export function LoginForm({
   className,
@@ -32,7 +33,7 @@ export function LoginForm({
   const [state, formAction] = useActionState(login, {
     error: null,
     success: false,
-  });
+  } as AuthActionState);
 
   const handleAction = async (formData: FormData) => {
     setIsPending(true);
@@ -132,5 +133,4 @@ export function LoginForm({
       </Card>
     </div>
   )
-}
-
+} 

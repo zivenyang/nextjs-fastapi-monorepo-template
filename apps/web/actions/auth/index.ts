@@ -2,48 +2,28 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { loginAccessToken, registerUser, logout as apiLogout } from "../api/sdk";
-import { z } from "zod";
+import { loginAccessToken, registerUser, logout as apiLogout } from "@/openapi/sdk";
+import { loginSchema, registerSchema } from "@/schemas/auth";
+import type { AuthActionState } from "@/types/auth";
+import { validateFormData, createErrorState, createSuccessState } from "@/lib/validation";
 
-export interface AuthState {
-  error: string | null;
-  success: boolean;
-}
-
-// 登录表单验证schema
-const loginSchema = z.object({
-  email: z.string().email("请输入有效的邮箱地址"),
-  password: z.string().min(6, "密码长度至少为6个字符"),
-});
-
-// 注册表单验证schema
-const registerSchema = z.object({
-  username: z.string().min(3, "用户名长度至少为3个字符"),
-  email: z.string().email("请输入有效的邮箱地址"),
-  password: z.string().min(6, "密码长度至少为6个字符"),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "两次输入的密码不一致",
-  path: ["confirmPassword"],
-});
-
+/**
+ * 登录操作
+ * 验证表单数据并调用登录API
+ */
 export async function login(
-  _prevState: AuthState,
+  _prevState: AuthActionState,
   formData: FormData
-): Promise<AuthState> {
+): Promise<AuthActionState> {
   try {
     // 获取表单数据
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
     // 验证表单数据
-    const validationResult = loginSchema.safeParse({ email, password });
-    if (!validationResult.success) {
-      const errorMessage = validationResult.error.issues[0]?.message || "表单验证失败";
-      return {
-        error: errorMessage,
-        success: false,
-      };
+    const validation = validateFormData(loginSchema, { email, password });
+    if (!validation.success) {
+      return createErrorState(validation.error!);
     }
 
     // 调用API登录
@@ -66,36 +46,28 @@ export async function login(
         path: "/",
       });
 
-      return {
-        error: null,
-        success: true,
-      };
+      return createSuccessState();
     } else {
-      return {
-        error: "登录失败，服务器没有返回Token",
-        success: false,
-      };
+      return createErrorState("登录失败，服务器没有返回Token");
     }
   } catch (error) {
     console.error("登录失败:", error);
     // 区分不同类型的错误
     if (error instanceof Error) {
-      return {
-        error: `登录失败: ${error.message}`,
-        success: false,
-      };
+      return createErrorState(`登录失败: ${error.message}`);
     }
-    return {
-      error: "登录时发生未知错误",
-      success: false,
-    };
+    return createErrorState("登录时发生未知错误");
   }
 }
 
+/**
+ * 注册操作
+ * 验证表单数据并调用注册API
+ */
 export async function register(
-  _prevState: AuthState,
+  _prevState: AuthActionState,
   formData: FormData
-): Promise<AuthState> {
+): Promise<AuthActionState> {
   try {
     // 获取表单数据
     const username = formData.get("username") as string;
@@ -104,19 +76,13 @@ export async function register(
     const confirmPassword = formData.get("confirmPassword") as string;
 
     // 验证表单数据
-    const validationResult = registerSchema.safeParse({ 
-      username, 
-      email, 
-      password, 
-      confirmPassword 
-    });
+    const validation = validateFormData(
+      registerSchema, 
+      { username, email, password, confirmPassword }
+    );
     
-    if (!validationResult.success) {
-      const errorMessage = validationResult.error.issues[0]?.message || "表单验证失败";
-      return {
-        error: errorMessage,
-        success: false,
-      };
+    if (!validation.success) {
+      return createErrorState(validation.error!);
     }
 
     // 调用API注册
@@ -128,39 +94,28 @@ export async function register(
       },
     });
 
-    return {
-      error: null,
-      success: true,
-    };
+    return createSuccessState();
   } catch (error) {
     console.error("注册失败:", error);
     // 区分不同类型的错误
     if (error instanceof Error) {
       // 尝试识别常见错误模式
       if (error.message.includes("email") && error.message.includes("already")) {
-        return {
-          error: "该邮箱已被注册",
-          success: false,
-        };
+        return createErrorState("该邮箱已被注册");
       }
       if (error.message.includes("username") && error.message.includes("already")) {
-        return {
-          error: "该用户名已被使用",
-          success: false,
-        };
+        return createErrorState("该用户名已被使用");
       }
-      return {
-        error: `注册失败: ${error.message}`,
-        success: false,
-      };
+      return createErrorState(`注册失败: ${error.message}`);
     }
-    return {
-      error: "注册时发生未知错误",
-      success: false,
-    };
+    return createErrorState("注册时发生未知错误");
   }
 }
 
+/**
+ * 登出操作
+ * 清除token并重定向到登录页面
+ */
 export async function logout() {
   try {
     // 获取token
@@ -188,6 +143,10 @@ export async function logout() {
   }
 }
 
+/**
+ * 检查认证状态
+ * 用于服务器端组件判断用户是否已登录
+ */
 export async function checkAuthStatus(): Promise<boolean> {
   try {
     const cookieStore = await cookies();
