@@ -37,6 +37,7 @@ cd fastapi-template/apps/api
 
 ```bash
 uv sync
+uv venv
 ```
 
 3. 配置环境变量：
