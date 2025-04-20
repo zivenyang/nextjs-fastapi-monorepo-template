@@ -9,6 +9,7 @@ from app.api.deps import get_current_user, get_db
 from app.models.user import User, UserProfile
 from app.schemas.user import UserResponse, UserUpdate
 from app.core.logging import get_logger
+from app.core.security import get_password_hash
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
@@ -148,7 +149,13 @@ async def update_user_me(
     
     try:
         # 更新用户基本信息
-        user_data = user_update.model_dump(exclude_unset=True, exclude={"profile"})
+        user_data = user_update.model_dump(exclude_unset=True, exclude={"profile", "password"})
+        
+        # 特殊处理密码字段
+        if user_update.password:
+            hashed_password = get_password_hash(user_update.password)
+            current_user.hashed_password = hashed_password
+            logger.info(f"用户 {current_user.id} 更新了密码")
         
         if user_data:
             for key, value in user_data.items():
