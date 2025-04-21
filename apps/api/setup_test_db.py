@@ -19,7 +19,7 @@ PG_USER = "postgres"
 PG_PASSWORD = "password"  # 根据实际情况修改
 PG_HOST = "localhost"
 PG_PORT = "5432"
-TEST_DB_NAME = "test-mydb"
+TEST_DB_NAME = "test_mydb"
 
 # 默认数据库（用于创建测试数据库）
 DEFAULT_DB_URL = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/postgres"

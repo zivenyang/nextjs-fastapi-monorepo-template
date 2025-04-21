@@ -13,7 +13,7 @@ from app.core.db import get_session
 from app.models.user import User
 from app.schemas.auth import TokenPayload
 from app.core.logging import get_logger
-from app.core.token_blacklist import logout_tokens  # 从正确的模块导入
+from app.core.token_blacklist import is_blacklisted  # 使用新的函数名
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
@@ -61,7 +61,7 @@ async def get_current_user(
             
         # 检查令牌是否在黑名单中
         jti = token_data.jti or str(token_data.sub)
-        if jti in logout_tokens:
+        if await is_blacklisted(jti):  # 使用异步方法
             logger.warning(f"令牌在黑名单中: {jti}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

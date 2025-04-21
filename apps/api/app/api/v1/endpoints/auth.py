@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header
@@ -13,7 +13,7 @@ from app.models.user import User
 from app.schemas.auth import Token
 from app.schemas.user import UserCreate, UserResponse
 from app.core.logging import get_logger
-from app.core.token_blacklist import logout_tokens, cleanup_expired_tokens  # 从单独的模块导入
+from app.core.token_blacklist import logout_tokens, cleanup_expired_tokens_compat  # 从单独的模块导入
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
@@ -63,7 +63,7 @@ async def login_access_token(
             )
         
         # 清理过期的登出令牌
-        cleanup_expired_tokens()
+        await cleanup_expired_tokens_compat()
         
         # 创建访问令牌
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -118,7 +118,7 @@ async def logout(
         
         if not exp:
             # 如果无法获取过期时间，使用当前时间加上默认过期时间
-            exp_time = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            exp_time = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         else:
             exp_time = datetime.fromtimestamp(exp)
             
@@ -126,7 +126,7 @@ async def logout(
         logout_tokens[jti] = exp_time
         
         # 清理过期的登出令牌
-        cleanup_expired_tokens()
+        await cleanup_expired_tokens_compat()
         
         logger.info(f"用户 {current_user.id} ({current_user.email}) 登出成功")
         return {"detail": "登出成功"}

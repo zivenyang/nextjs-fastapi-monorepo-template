@@ -79,6 +79,16 @@ class Settings(BaseSettings):
         description="数据库连接字符串 - SQLAlchemy格式"
     )
     
+    # Redis设置
+    REDIS_HOST: str = Field("localhost", description="Redis主机地址")
+    REDIS_PORT: int = Field(6379, description="Redis端口")
+    REDIS_DB: int = Field(0, description="Redis数据库索引")
+    REDIS_PASSWORD: Optional[str] = Field(None, description="Redis密码")
+    REDIS_ENABLED: bool = Field(True, description="是否启用Redis缓存")
+    # API缓存设置
+    API_CACHE_ENABLED: bool = Field(True, description="是否启用API响应缓存")
+    API_CACHE_EXPIRE_SECONDS: int = Field(300, description="API缓存默认过期时间（秒）")
+    
     # 其他设置
     DEBUG: bool = Field(False, description="是否开启调试模式")
     TESTING: bool = Field(False, description="是否为测试环境")
@@ -127,6 +137,8 @@ if DEBUG:
     print(f"API版本路径: {API_V1_STR}")
     print(f"认证路径: {settings.FULL_AUTH_TOKEN_URL}")
     print(f"数据库URL: {settings.DATABASE_URL}")
+    print(f"Redis: {'启用' if settings.REDIS_ENABLED else '禁用'} ({settings.REDIS_HOST}:{settings.REDIS_PORT})")
+    print(f"API缓存: {'启用' if settings.API_CACHE_ENABLED else '禁用'}")
     print(f"调试模式: {'开启' if DEBUG else '关闭'}")
     print(f"测试模式: {'开启' if settings.TESTING else '关闭'}")
     print(f"日志级别: {settings.LOGGING_LEVEL}")

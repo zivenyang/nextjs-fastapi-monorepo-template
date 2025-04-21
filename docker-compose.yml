@@ -18,7 +18,24 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped     # 除非手动停止，否则总是尝试重启
+    
+  redis:
+    image: redis:7-alpine      # 使用Alpine版本减小镜像体积
+    container_name: redis_cache
+    ports:
+      - "6379:6379"            # 将Redis默认端口映射到主机
+    volumes:
+      - redis_data:/data       # Redis数据持久化
+    command: redis-server --appendonly yes  # 启用AOF持久化
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]    # 健康检查
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped     # 除非手动停止，否则总是尝试重启
 
 volumes:
   postgres_data: # 定义命名卷，Docker 会管理它的存储位置
+    driver: local 
+  redis_data:    # Redis数据持久化卷
     driver: local 
