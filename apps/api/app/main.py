@@ -4,11 +4,21 @@ import uvicorn
 from app.core.db import init_db
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import setup_middlewares
+# 导入自定义异常和处理器
+from app.core.exceptions import AppException
+from app.core.exception_handlers import (
+    app_exception_handler,
+    validation_exception_handler,
+    http_exception_handler,
+    generic_exception_handler,
+)
 
 # 初始化日志系统
 configure_logging()
@@ -52,6 +62,14 @@ setup_middlewares(app)
 # 注册API路由
 app.include_router(api_router, prefix=settings.API_V1_STR)
 logger.info(f"API路由已注册，前缀: {settings.API_V1_STR}")
+
+# 注册异常处理器
+app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+# 通用异常处理器应该最后注册
+app.add_exception_handler(Exception, generic_exception_handler)
+logger.info("全局异常处理器已注册")
 
 # @app.get("/")
 # def read_root():

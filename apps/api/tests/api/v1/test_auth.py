@@ -40,10 +40,13 @@ async def test_register_existing_email(client: AsyncClient, test_user):
             "full_name": "Another User"
         }
     )
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    # 期望状态码为 409 Conflict
+    assert response.status_code == status.HTTP_409_CONFLICT
     data = response.json()
     assert "detail" in data
-    assert "已被注册" in data["detail"]
+    # 确认错误详情匹配服务层抛出的具体消息格式
+    expected_detail = f"邮箱 {test_user.email} 已被注册"
+    assert data["detail"] == expected_detail
 
 async def test_register_invalid_email(client: AsyncClient):
     """测试使用无效邮箱注册"""

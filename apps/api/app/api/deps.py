@@ -1,7 +1,7 @@
 from typing import AsyncGenerator
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from pydantic import ValidationError
@@ -19,6 +19,11 @@ from app.core import security
 from app.services.user_service import UserService
 from app.repositories.interfaces.user_interface import IUserRepository
 from app.repositories.sql.user_repository import SQLUserRepository
+from app.core.exceptions import (
+    InvalidTokenException,
+    UserNotFoundException,
+    AppException # 基础异常可能也需要
+)
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
@@ -39,7 +44,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
              yield session
     except Exception as e:
          logger.error(f"获取数据库会话失败: {e}", exc_info=True)
-         raise HTTPException(status_code=500, detail="数据库连接失败")
+         # 让全局处理器处理
+         raise # 或者 raise DatabaseConnectionError() 如果定义了
     finally:
         logger.debug("数据库会话依赖结束") # 关闭由 context manager 处理
 
@@ -76,44 +82,43 @@ async def get_current_user(
     """验证token并获取当前用户 (包含黑名单检查)"""
     logger.debug("验证用户令牌")
 
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="无法验证凭据",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
     try:
         payload = security.decode_jwt_token(token)
         if payload is None:
             logger.warning("获取当前用户失败: 令牌解码失败或无效")
-            raise credentials_exception
+            raise InvalidTokenException(detail="无效或格式错误的认证令牌")
 
         user_id: str | None = payload.get("sub")
         jti: str | None = payload.get("jti")
 
         if user_id is None:
             logger.warning("获取当前用户失败: 令牌中缺少 'sub' (user_id)")
-            raise credentials_exception
+            raise InvalidTokenException(detail="无效或格式错误的认证令牌")
 
         if jti and await is_blacklisted(jti):
             logger.warning(f"获取当前用户失败: 令牌已加入黑名单 (jti: {jti})")
-            raise credentials_exception
+            raise InvalidTokenException(detail="认证令牌已失效 (已登出)")
 
-    except JWTError as e:
-        logger.warning(f"获取当前用户失败: JWT错误 - {str(e)}")
-        raise credentials_exception
-    except Exception as e:
-        logger.error(f"获取当前用户时发生意外错误: {str(e)}", exc_info=True)
-        raise credentials_exception
+        # --- 用户查找：保持使用 db.get 或改为使用仓库 --- 
+        try:
+            user = await db.get(User, UUID(user_id))
+        except Exception as e:
+            logger.error(f"根据令牌中的 user_id ({user_id}) 查找用户时出错: {e}", exc_info=True)
+            raise InvalidTokenException(detail="无法根据令牌查找用户")
+            
+        if user is None:
+            logger.warning(f"获取当前用户失败: 未找到用户ID {user_id}")
+            raise UserNotFoundException(detail="令牌对应的用户不存在")
 
-    # --- 用户查找：保持使用 db.get 或改为使用仓库 --- 
-    # 方案 A: 保持现状 (直接用 db.get)
-    user = await db.get(User, UUID(user_id))
-    # 方案 B: 改为使用仓库 (需要注入 user_repo)
-    # user = await user_repo.get_by_id(UUID(user_id))
-    
-    if user is None:
-        logger.warning(f"获取当前用户失败: 未找到用户ID {user_id}")
-        raise credentials_exception
-    
+    except (JWTError, ValidationError) as e: # 捕获已知的解码/验证错误
+        logger.warning(f"获取当前用户失败: 令牌验证/解码错误 - {str(e)}")
+        raise InvalidTokenException(detail="无法验证认证令牌")
+    except (InvalidTokenException, UserNotFoundException): # 重新抛出我们自己定义的特定异常
+        raise
+    except Exception as e: # 捕获真正未预料到的其他错误
+        logger.error(f"获取当前用户时发生未预料的服务器内部错误: {str(e)}", exc_info=True)
+        # 对于真正意外的错误，应该返回 500
+        raise AppException(detail="处理认证时发生内部错误", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     logger.debug(f"成功获取当前用户: {user.id} ({user.email})")
     return user

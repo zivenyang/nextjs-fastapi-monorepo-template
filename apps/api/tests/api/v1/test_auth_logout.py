@@ -107,4 +107,6 @@ async def test_logout_twice(client: AsyncClient, test_user_token):
     data = response.json()
     assert "detail" in data
     # 修改断言以匹配 get_current_user 中抛出的实际错误信息
-    assert "无法验证凭据" in data["detail"] 
+    # assert "无法验证凭据" in data["detail"] 
+    # 使用 deps.py 中黑名单检查抛出的 InvalidTokenException 的 detail
+    assert "认证令牌已失效 (已登出)" == data["detail"] 

@@ -2,7 +2,6 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import HTTPException, status
 
@@ -12,17 +11,19 @@ from app.core.security import get_password_hash
 from app.core.logging import get_logger
 # 导入仓库接口
 from app.repositories.interfaces.user_interface import IUserRepository
+# 导入自定义异常
+from app.core.exceptions import EmailAlreadyExistsException, UserNotFoundException
 
 logger = get_logger(__name__)
 
 # --- 添加异常类定义 ---
-class UserNotFoundException(Exception):
-    """当尝试操作的用户不存在时抛出"""
-    pass
+# class UserNotFoundException(Exception):
+#     \"\"\"当尝试操作的用户不存在时抛出\"\"\"
+#     pass
 
-class EmailAlreadyExistsException(Exception):
-    """当尝试创建的用户邮箱已存在时抛出"""
-    pass
+# class EmailAlreadyExistsException(Exception):
+#     \"\"\"当尝试创建的用户邮箱已存在时抛出\"\"\"
+#     pass
 # --- 结束添加 ---
 
 class UserService:
@@ -146,10 +147,8 @@ class UserService:
         except Exception as e:
             await self.db.rollback()
             self.logger.error(f"服务层: 更新用户 {user_to_update.id} 失败: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="更新用户信息时发生内部错误"
-            )
+            # 不再抛出 HTTPException，让全局处理器处理
+            raise e
 
     async def get_user_by_email(self, email: str) -> Optional[User]:
         """通过邮箱获取用户 (现在通过仓库)"""
@@ -204,10 +203,8 @@ class UserService:
         except Exception as e:
             await self.db.rollback()
             self.logger.error(f"服务层: 创建用户失败: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="创建用户时发生内部错误"
-            )
+            # 不再抛出 HTTPException，让全局处理器处理
+            raise e
 
 # 不再需要全局 logger，因为每个服务实例都有自己的 logger
 # logger = get_logger(__name__) 

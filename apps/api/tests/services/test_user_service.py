@@ -324,30 +324,33 @@ async def test_update_user_existing_profile(mock_db_session: MagicMock, mock_use
 
 # 修改测试用例，注入 mock_user_repo
 async def test_update_user_commit_fails(mock_db_session: MagicMock, mock_user_repo: MagicMock):
-    """测试数据库提交失败的回滚"""
+    """测试更新用户时数据库提交失败"""
     user_id = uuid4()
-    user_to_update = User(id=user_id, email="fail@example.com", hashed_password="hash")
-    user_update_data = UserUpdate(full_name="Trying To Update")
+    user_to_update = User(id=user_id, email="commitfail@example.com", hashed_password="hash")
+    user_update_data = UserUpdate(full_name="Commit Fail Name")
 
     # 模拟仓库 profile 查询返回 None
     mock_user_repo.get_profile_by_user_id.return_value = None
-    # 模拟 commit 抛出异常
-    mock_db_session.commit.side_effect = RuntimeError("DB commit failed")
+
+    # 模拟 commit 失败
+    commit_error = RuntimeError("DB commit failed")
+    mock_db_session.commit.side_effect = commit_error
 
     user_service = UserService(db=mock_db_session, user_repo=mock_user_repo)
 
-    with pytest.raises(HTTPException) as exc_info:
+    # 使用 pytest.raises 检查是否抛出了预期的 RuntimeError
+    with pytest.raises(RuntimeError, match="DB commit failed"):
         await user_service.update_user(
             user_to_update=user_to_update, user_update_data=user_update_data
         )
 
-    assert exc_info.value.status_code == 500
-    assert "更新用户信息时发生内部错误" in exc_info.value.detail
-    # 确认仓库 update_user 被调用
+    # 确认调用了 update_user
     mock_user_repo.update_user.assert_awaited_once_with(user_to_update)
-    # 确认事务尝试提交并回滚
+    # 确认尝试了 commit
     mock_db_session.commit.assert_awaited_once()
+    # 确认调用了 rollback
     mock_db_session.rollback.assert_awaited_once()
+    # 确认 refresh 没有被调用
     mock_db_session.refresh.assert_not_awaited()
 
 # --- Helper for get_users tests ---
@@ -641,32 +644,32 @@ async def test_update_user_only_profile(mock_db_session: MagicMock, mock_user_re
 
 # 修改测试用例，注入 mock_user_repo
 async def test_create_user_commit_fails(mock_db_session: MagicMock, mock_user_repo: MagicMock):
-    """测试创建用户时数据库提交失败的回滚"""
+    """测试创建用户时数据库提交失败"""
     user_in = UserCreate(
-        email="failcreate@example.com",
+        email="createfail@example.com",
         password="password123",
-        username="failuser",
+        username="createfail",
     )
-
-    # 模拟仓库邮箱检查返回 None
+    # 模拟仓库的 get_by_email (检查邮箱是否存在)
     mock_user_repo.get_by_email.return_value = None
-    # 模拟 commit 抛出异常
-    mock_db_session.commit.side_effect = RuntimeError("DB commit failed during create")
 
-    user_service = UserService(db=mock_db_session, user_repo=mock_user_repo)
+    # 模拟 commit 失败
+    commit_error = RuntimeError("DB commit failed during create")
+    mock_db_session.commit.side_effect = commit_error
 
-    with patch('app.services.user_service.get_password_hash', return_value="hashed_password_fail") as mock_hash:
-        with pytest.raises(HTTPException) as exc_info:
+    with patch('app.services.user_service.get_password_hash', return_value="hashed"):
+        user_service = UserService(db=mock_db_session, user_repo=mock_user_repo)
+
+        # 使用 pytest.raises 检查是否抛出了预期的 RuntimeError
+        with pytest.raises(RuntimeError, match="DB commit failed during create"):
             await user_service.create_user(user_create_data=user_in)
 
-    assert exc_info.value.status_code == 500
-    assert "创建用户时发生内部错误" in exc_info.value.detail
-
-    # 确认仓库调用
+    # 确认调用了 get_by_email 和 create_user
     mock_user_repo.get_by_email.assert_awaited_once_with(user_in.email)
     mock_user_repo.create_user.assert_awaited_once()
-    mock_hash.assert_called_once_with(user_in.password)
-    # 确认事务尝试提交并回滚
+    # 确认尝试了 commit
     mock_db_session.commit.assert_awaited_once()
+    # 确认调用了 rollback
     mock_db_session.rollback.assert_awaited_once()
+    # 确认 refresh 没有被调用
     mock_db_session.refresh.assert_not_awaited()
