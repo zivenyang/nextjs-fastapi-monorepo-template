@@ -3,14 +3,14 @@ import json
 from datetime import timedelta
 import uuid
 from unittest.mock import patch, AsyncMock, MagicMock
+from app.core.config import settings
 
 from app.core.redis_cache import (
     RedisCache,
     get_redis_client,
     api_cache,
     add_token_to_blacklist,
-    is_token_blacklisted,
-    cleanup_expired_tokens
+    is_token_blacklisted
 )
 
 
@@ -159,12 +159,4 @@ class TestJWTCache:
         with patch("app.core.redis_cache.jwt_cache_instance.exists", 
                    side_effect=Exception("测试异常")):
             result = await is_token_blacklisted(token_jti)
-            assert result is True  # 出错时应该返回True（安全起见）
-
-    @pytest.mark.asyncio
-    async def test_cleanup_expired_tokens(self, mock_redis):
-        """测试清理过期令牌功能"""
-        # 由于Redis会自动过期密钥，此函数主要是兼容性功能
-        result = await cleanup_expired_tokens()
-        # 清理函数应该返回None或某个确认值
-        assert result is not None 
+            assert result is True  # 出错时应该返回True（安全起见） 

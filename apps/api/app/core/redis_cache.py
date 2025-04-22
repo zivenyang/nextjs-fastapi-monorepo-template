@@ -18,20 +18,44 @@ T = TypeVar("T", bound=Callable[..., Awaitable[Any]])
 # Redis客户端单例
 _redis_client = None
 
-async def get_redis_client() -> redis_async.Redis:
+async def get_redis_client() -> redis_async.Redis | None:
     """
     获取Redis客户端实例（单例模式）
+    如果 Redis 未启用，则返回 None
     """
     global _redis_client
+    # 检查 Redis 是否启用
+    if not settings.REDIS_ENABLED:
+        if _redis_client is not None:
+             # 如果之前已创建但现在禁用了，尝试关闭 (可选)
+             try:
+                 await _redis_client.close()
+             except Exception:
+                 pass # 忽略关闭错误
+             _redis_client = None
+        logger.info("Redis 已禁用，跳过客户端初始化。")
+        return None
+        
     if _redis_client is None:
         logger.info("初始化Redis客户端连接")
-        _redis_client = redis_async.Redis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            db=settings.REDIS_DB,
-            password=settings.REDIS_PASSWORD or None,
-            decode_responses=False  # 我们自己处理解码
-        )
+        try:
+            _redis_client = redis_async.Redis(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                db=settings.REDIS_DB,
+                password=settings.REDIS_PASSWORD or None,
+                decode_responses=False,  # 我们自己处理解码
+                socket_timeout=5, # 添加超时
+                socket_connect_timeout=5 # 添加连接超时
+            )
+            # 尝试 ping 一下确保连接成功 (可选但推荐)
+            await _redis_client.ping()
+            logger.info("Redis 客户端连接成功")
+        except Exception as e:
+            logger.error(f"初始化 Redis 客户端失败: {str(e)}", exc_info=True)
+            _redis_client = None # 连接失败，重置为 None
+            return None
+            
     return _redis_client
 
 
@@ -47,13 +71,18 @@ class RedisCache:
             prefix: 缓存键前缀，用于避免键名冲突
         """
         self.prefix = prefix
-        self._redis = None
+        self._redis: redis_async.Redis | None = None # 明确类型可能为 None
         logger.debug(f"创建Redis缓存服务 (prefix: {prefix})")
     
-    async def _get_redis(self) -> redis_async.Redis:
+    async def _get_redis(self) -> redis_async.Redis | None:
         """
-        获取Redis连接
+        获取Redis连接 (如果 Redis 已启用)
         """
+        # 只有在 Redis 启用时才尝试获取客户端
+        if not settings.REDIS_ENABLED:
+             if self._redis is not None: self._redis = None # 确保内部状态一致
+             return None
+             
         if self._redis is None:
             self._redis = await get_redis_client()
         return self._redis
@@ -66,20 +95,16 @@ class RedisCache:
     
     async def set(self, key: str, value: Any, expire: Optional[int] = None) -> bool:
         """
-        设置缓存
-        
-        Args:
-            key: 缓存键
-            value: 缓存值（将被JSON序列化）
-            expire: 过期时间（秒）
-            
-        Returns:
-            bool: 操作是否成功
+        设置缓存 (如果 Redis 已启用)
         """
+        redis = await self._get_redis()
+        if redis is None:
+            logger.debug(f"Redis 未启用或连接失败，跳过设置缓存: {self.prefix}:{key}")
+            return False # 操作未执行
+            
         try:
             full_key = self._get_key(key)
             serialized_value = json.dumps(value)
-            redis = await self._get_redis()
             result = await redis.set(full_key, serialized_value, ex=expire)
             logger.debug(f"设置缓存 {full_key}, expire={expire}")
             return result
@@ -89,19 +114,15 @@ class RedisCache:
     
     async def setex(self, key: str, expire: int, value: str) -> bool:
         """
-        设置缓存并指定过期时间（用于黑名单令牌等无需序列化的值）
-        
-        Args:
-            key: 缓存键
-            expire: 过期时间（秒）
-            value: 缓存值（将直接存储，不进行序列化）
-            
-        Returns:
-            bool: 操作是否成功
+        设置缓存并指定过期时间 (如果 Redis 已启用)
         """
+        redis = await self._get_redis()
+        if redis is None:
+            logger.debug(f"Redis 未启用或连接失败，跳过设置带过期时间的缓存: {self.prefix}:{key}")
+            return False
+            
         try:
             full_key = self._get_key(key)
-            redis = await self._get_redis()
             result = await redis.setex(full_key, expire, value)
             logger.debug(f"设置带过期时间的缓存 {full_key}, expire={expire}")
             return result
@@ -111,17 +132,15 @@ class RedisCache:
     
     async def get(self, key: str) -> Any:
         """
-        获取缓存
-        
-        Args:
-            key: 缓存键
-            
-        Returns:
-            Any: 缓存值，未找到返回None
+        获取缓存 (如果 Redis 已启用)
         """
+        redis = await self._get_redis()
+        if redis is None:
+            logger.debug(f"Redis 未启用或连接失败，跳过获取缓存: {self.prefix}:{key}")
+            return None
+            
         try:
             full_key = self._get_key(key)
-            redis = await self._get_redis()
             data = await redis.get(full_key)
             if data is None:
                 logger.debug(f"缓存未命中 {full_key}")
@@ -136,17 +155,15 @@ class RedisCache:
     
     async def delete(self, key: str) -> int:
         """
-        删除缓存
-        
-        Args:
-            key: 缓存键
-            
-        Returns:
-            int: 删除的键数量
+        删除缓存 (如果 Redis 已启用)
         """
+        redis = await self._get_redis()
+        if redis is None:
+            logger.debug(f"Redis 未启用或连接失败，跳过删除缓存: {self.prefix}:{key}")
+            return 0
+            
         try:
             full_key = self._get_key(key)
-            redis = await self._get_redis()
             result = await redis.delete(full_key)
             logger.debug(f"删除缓存 {full_key}")
             return result
@@ -156,20 +173,16 @@ class RedisCache:
     
     async def exists(self, key: str) -> bool:
         """
-        检查缓存是否存在
-        
-        Args:
-            key: 缓存键
-            
-        Returns:
-            bool: 是否存在
+        检查缓存是否存在 (如果 Redis 已启用)
         """
+        redis = await self._get_redis()
+        if redis is None:
+            logger.debug(f"Redis 未启用或连接失败，跳过检查缓存: {self.prefix}:{key}")
+            return False
+            
         try:
             full_key = self._get_key(key)
-            redis = await self._get_redis()
-            # Redis的exists命令返回整数：0表示不存在，非0表示存在
             exists_count = await redis.exists(full_key)
-            # 转换为布尔值：0 -> False, 非0 -> True
             result = bool(exists_count)
             logger.debug(f"检查缓存 {full_key} 存在: {result}")
             return result
@@ -198,6 +211,19 @@ def api_cache(expire: int = 300):
     def decorator(func: T) -> T:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
+            # 检查 API 缓存是否启用
+            if not settings.API_CACHE_ENABLED:
+                logger.debug(f"API 缓存已禁用，直接执行函数: {func.__name__}")
+                return await func(*args, **kwargs)
+                
+            # 检查 Redis 是否启用 (通过实例方法间接检查)
+            # 如果 Redis 未启用，get/set 会直接返回默认值，效果类似跳过
+            # 但我们也可以在这里显式检查 Redis 状态，如果 Redis 必须可用的话
+            # redis_client = await api_cache_instance._get_redis()
+            # if redis_client is None:
+            #     logger.warning(f"Redis 未启用或不可用，无法为 {func.__name__} 提供缓存，直接执行函数。")
+            #     return await func(*args, **kwargs)
+
             # 获取缓存键
             # 根据函数名称和参数生成缓存键
             func_name = func.__name__
@@ -289,16 +315,4 @@ async def is_token_blacklisted(token_jti: str) -> bool:
     except Exception as e:
         logger.error(f"检查令牌黑名单失败: {str(e)}", exc_info=True)
         # 出现错误时，为安全起见，视为在黑名单中
-        return True
-
-
-async def cleanup_expired_tokens() -> int:
-    """
-    清理过期的黑名单令牌
-    注意：使用Redis时，过期的键会自动删除，此函数主要用于兼容现有代码
-    
-    Returns:
-        int: 已清理的令牌数量（使用Redis时固定返回0）
-    """
-    logger.debug("Redis会自动清理过期令牌，无需手动清理")
-    return 0 
+        return True 

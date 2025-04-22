@@ -17,18 +17,22 @@ class UserBase(BaseModel):
     is_verified: Optional[bool] = Field(None, description="邮箱是否已验证")
     
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
     """用户创建数据模型"""
     email: Annotated[str, EmailStr] = Field(..., description="用户邮箱（必填）")
     password: str = Field(..., min_length=8, description="用户密码（至少8位）")
-    
+    username: Optional[str] = Field(None, description="用户名")
+    full_name: Optional[str] = Field(None, description="用户全名")
+    role: Optional[UserRole] = Field(None, description="用户角色")
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "email": "user@example.com",
                 "password": "strongpassword",
                 "username": "username",
-                "full_name": "Full Name"
+                "full_name": "Full Name",
+                "role": "user"
             }
         }
     )

@@ -10,3 +10,4 @@ from tests.fixtures.database import *  # noqa: F401, F403
 from tests.fixtures.http_client import *  # noqa: F401, F403
 from tests.fixtures.users import *  # noqa: F401, F403
 from tests.fixtures.auth import *  # noqa: F401, F403
+from tests.fixtures.redis import * # noqa: F401, F403

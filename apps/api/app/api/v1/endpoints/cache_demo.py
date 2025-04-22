@@ -1,12 +1,9 @@
-from typing import Any, List
 import time
 from datetime import datetime
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.deps import get_db, get_current_user
+from app.api.deps import get_current_user
 from app.core.logging import get_logger
 from app.models.user import User
 from app.core.redis_cache import api_cache

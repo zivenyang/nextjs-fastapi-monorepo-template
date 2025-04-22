@@ -3,7 +3,8 @@ from typing import Any, Union, Optional, Dict
 import uuid
 
 from jose import jwt, JWTError
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
+from pwdlib.hashers.bcrypt import BcryptHasher
 
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -11,9 +12,9 @@ from app.core.logging import get_logger
 # 创建模块日志记录器
 logger = get_logger(__name__)
 
-# 创建一个密码哈希上下文，使用 bcrypt 算法
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-logger.debug("密码哈希上下文已初始化 (scheme: bcrypt)")
+# 正确初始化 PasswordHash，传入 Hasher 实例的元组
+pwd_hasher = PasswordHash((BcryptHasher(),))
+logger.debug("Password hasher (pwdlib.PasswordHash) initialized with BcryptHasher instance.")
 
 
 def create_access_token(
@@ -75,12 +76,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     验证明文密码是否与哈希密码匹配
     """
     try:
-        result = pwd_context.verify(plain_password, hashed_password)
-        log_message = "密码验证成功" if result else "密码验证失败"
-        logger.debug(log_message)
-        return result
+        # 捕获并保存 verify 方法的返回值！
+        result = pwd_hasher.verify(plain_password, hashed_password)
+        # 根据返回值判断密码是否匹配
+        if result:
+            logger.debug("密码验证成功")
+        else:
+            logger.debug("密码验证失败：不匹配")
+        return result  # 返回实际的验证结果
     except Exception as e:
-        logger.error(f"密码验证过程出错: {str(e)}", exc_info=True)
+        # 仍然捕获可能的异常，例如无效哈希等
+        logger.debug(f"密码验证过程中发生错误: {str(e)}")
         return False
 
 
@@ -89,7 +95,8 @@ def get_password_hash(password: str) -> str:
     获取密码的哈希值
     """
     try:
-        hashed = pwd_context.hash(password)
+        # 使用正确初始化的 pwd_hasher 实例的 hash 方法
+        hashed = pwd_hasher.hash(password)
         logger.debug("密码哈希生成成功")
         return hashed
     except Exception as e:

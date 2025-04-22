@@ -1,32 +1,51 @@
 import pytest
+from datetime import datetime, timedelta, UTC
+
 from httpx import AsyncClient
 from fastapi import status
-
-from app.core.token_blacklist import logout_tokens
 
 # 标记所有测试为异步和认证测试
 pytestmark = [pytest.mark.asyncio, pytest.mark.auth, pytest.mark.api]
 
+# 移除无效导入
+# from tests.utils.user import create_random_user_instance
+# from tests.utils.auth import authenticate_user
+
 
 async def test_logout_success(client: AsyncClient, test_user_token):
-    """测试用户成功登出"""
-    # 先记录下当前黑名单长度
-    initial_blacklist_length = len(logout_tokens)
+    """测试用户成功登出，并验证令牌失效"""
+    # 移除对内存字典的检查
+    # initial_blacklist_length = len(logout_tokens)
     
-    # 使用获取的令牌执行登出
-    response = await client.post(
+    token_header = {"Authorization": f"Bearer {test_user_token}"}
+    
+    # 1. 验证令牌在登出前是有效的 (可选但有帮助)
+    response_before = await client.get("/api/v1/users/me", headers=token_header)
+    assert response_before.status_code == status.HTTP_200_OK
+    
+    # 2. 执行登出
+    response_logout = await client.post(
         "/api/v1/auth/logout",
-        headers={"Authorization": f"Bearer {test_user_token}"}
+        headers=token_header
     )
     
-    # 验证响应状态码和内容
-    assert response.status_code == status.HTTP_200_OK
-    data = response.json()
+    # 验证登出响应状态码和内容
+    assert response_logout.status_code == status.HTTP_200_OK
+    data = response_logout.json()
     assert "detail" in data
     assert data["detail"] == "登出成功"
     
-    # 验证黑名单长度增加了
-    assert len(logout_tokens) > initial_blacklist_length
+    # 移除对内存字典的检查
+    # assert len(logout_tokens) > initial_blacklist_length
+    
+    # 3. 验证令牌在登出后是无效的
+    response_after = await client.get("/api/v1/users/me", headers=token_header)
+    assert response_after.status_code == status.HTTP_401_UNAUTHORIZED
+    # 可以进一步检查错误详情，它应该提示令牌失效或需要认证
+    error_data = response_after.json()
+    assert "detail" in error_data
+    # The detail might be 'Not authenticated', 'Token has expired', or 'Token is blacklisted' depending on the exact check order in deps.py
+    # Checking for 401 is usually sufficient for API tests.
 
 
 async def test_logout_invalid_token(client: AsyncClient):
@@ -40,7 +59,7 @@ async def test_logout_invalid_token(client: AsyncClient):
     # 验证响应状态码是401 Unauthorized
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     data = response.json()
-    assert "detail" in data
+    assert "detail" in data # FastAPI/Starlette might return a default 401 detail
 
 
 async def test_logout_missing_token(client: AsyncClient):
@@ -48,8 +67,8 @@ async def test_logout_missing_token(client: AsyncClient):
     # 不提供Authorization头
     response = await client.post("/api/v1/auth/logout")
     
-    # 验证响应状态码是401或422
-    assert response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_422_UNPROCESSABLE_ENTITY]
+    # 验证响应状态码是401 Unauthorized (因为 get_current_user 依赖会失败)
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 async def test_logout_wrong_token_type(client: AsyncClient, test_user_token):
@@ -61,11 +80,12 @@ async def test_logout_wrong_token_type(client: AsyncClient, test_user_token):
     )
     
     # 验证响应状态码是401 Unauthorized
+    # logout 接口本身不直接依赖 oauth2_scheme，所以它会处理请求
+    # 但是解析 "Basic ..." 会失败，或者 decode_jwt_token 会失败
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     data = response.json()
-    # FastAPI的OAuth2认证中间件会自动返回"Not authenticated"错误
     assert "detail" in data
-    assert data["detail"] == "Not authenticated"
+    # 错误详情可能是 "无效的认证头" 或 "无效的令牌"
 
 
 async def test_logout_twice(client: AsyncClient, test_user_token):

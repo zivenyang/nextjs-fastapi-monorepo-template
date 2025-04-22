@@ -7,17 +7,20 @@
 
 import logging
 import sys
-import os
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
-from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import List
 import traceback
+# 导入 contextvars
+import contextvars 
 
 from app.core.config import settings, API_ROOT
 
-# 日志格式
-DEFAULT_FORMAT = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)d)"
-VERBOSE_FORMAT = "%(asctime)s [%(levelname)8s] %(name)s - %(message)s (%(filename)s:%(lineno)d)"
+# 定义请求 ID 的 ContextVar
+request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
+
+# 日志格式 (添加 request_id)
+DEFAULT_FORMAT = "%(asctime)s [%(levelname)8s] [%(request_id)s] %(message)s (%(filename)s:%(lineno)d)"
+VERBOSE_FORMAT = "%(asctime)s [%(levelname)8s] [%(request_id)s] %(name)s - %(message)s (%(filename)s:%(lineno)d)"
 
 # 日志级别映射
 LOG_LEVELS = {
@@ -60,6 +63,13 @@ class ModuleFilter(logging.Filter):
             return True
         return any(record.name.startswith(module) for module in self.modules)
 
+# 新增：请求 ID 过滤器
+class RequestIdFilter(logging.Filter):
+    """将 request_id 从 contextvar 注入到日志记录中"""
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = request_id_var.get()
+        return True
+
 # 异常跟踪格式化器
 class ExceptionFormatter:
     """
@@ -86,6 +96,7 @@ def configure_logging() -> None:
     设置全局日志记录器，包括控制台和文件处理器
     """
     log_level = get_log_level()
+    request_id_filter = RequestIdFilter() # 创建过滤器实例
     
     # 配置根日志记录器
     root_logger = logging.getLogger()
@@ -100,6 +111,7 @@ def configure_logging() -> None:
     console_handler.setLevel(log_level)
     console_formatter = logging.Formatter(DEFAULT_FORMAT)
     console_handler.setFormatter(console_formatter)
+    console_handler.addFilter(request_id_filter) # 添加过滤器
     root_logger.addHandler(console_handler)
     
     # 非测试环境添加文件处理器
@@ -114,6 +126,7 @@ def configure_logging() -> None:
         file_handler.setLevel(log_level)
         file_formatter = logging.Formatter(VERBOSE_FORMAT)
         file_handler.setFormatter(file_formatter)
+        file_handler.addFilter(request_id_filter) # 添加过滤器
         root_logger.addHandler(file_handler)
         
         # 错误日志 - 按日期轮转
@@ -127,6 +140,7 @@ def configure_logging() -> None:
         error_handler.setLevel(logging.ERROR)
         error_formatter = logging.Formatter(VERBOSE_FORMAT)
         error_handler.setFormatter(error_formatter)
+        error_handler.addFilter(request_id_filter) # 添加过滤器
         root_logger.addHandler(error_handler)
     
     # 设置第三方库的日志级别

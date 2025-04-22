@@ -13,7 +13,8 @@ from app.models.user import User
 from app.schemas.auth import Token
 from app.schemas.user import UserCreate, UserResponse
 from app.core.logging import get_logger
-from app.core.token_blacklist import logout_tokens, cleanup_expired_tokens_compat  # 从单独的模块导入
+from app.core.token_blacklist import add_to_blacklist
+from app.services.user_service import user_service
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
@@ -33,10 +34,7 @@ async def login_access_token(
     
     try:
         # 查询用户
-        query = select(User).where(User.email == form_data.username.lower())
-        logger.debug(f"执行查询: {query}")
-        result = await db.execute(query)
-        user = result.scalar_one_or_none()
+        user = await user_service.get_user_by_email(db=db, email=form_data.username)
         
         # 验证用户和密码
         if not user:
@@ -47,8 +45,12 @@ async def login_access_token(
                 headers={"WWW-Authenticate": "Bearer"},
             )
             
-        if not verify_password(form_data.password, user.hashed_password):
-            logger.warning(f"登录失败: 用户 {form_data.username} 密码错误")
+        logger.debug(f"开始验证用户 {user.email} 的密码")
+        password_match = verify_password(form_data.password, user.hashed_password)
+        logger.debug(f"密码验证函数 verify_password 返回值: {password_match}")
+        
+        if not password_match:
+            logger.warning(f"登录失败: 用户 {form_data.username} 密码错误 (验证函数返回 False)")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="用户名或密码错误",
@@ -61,9 +63,6 @@ async def login_access_token(
                 status_code=status.HTTP_400_BAD_REQUEST, 
                 detail="用户未激活"
             )
-        
-        # 清理过期的登出令牌
-        await cleanup_expired_tokens_compat()
         
         # 创建访问令牌
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -95,17 +94,22 @@ async def logout(
     """
     try:
         # 从授权头中提取令牌
-        token_type, token = authorization.split()
-        if token_type.lower() != "bearer":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="无效的认证类型",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        try:
+            token_type, token = authorization.split()
+            if token_type.lower() != "bearer":
+                raise ValueError("Invalid token type")
+        except ValueError:
+             logger.warning("登出失败: 无效的 Authorization Header 格式")
+             raise HTTPException(
+                 status_code=status.HTTP_401_UNAUTHORIZED,
+                 detail="无效的认证头",
+                 headers={"WWW-Authenticate": "Bearer"},
+             )
             
         # 解码令牌以获取其到期时间和唯一标识符
         token_data = decode_jwt_token(token)
         if not token_data:
+            logger.warning("登出失败: 无法解码令牌")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="无效的令牌",
@@ -113,22 +117,40 @@ async def logout(
             )
             
         # 获取令牌的有效期和标识
-        jti = token_data.get("jti") or str(current_user.id)  # 使用用户ID作为备用标识
+        jti = token_data.get("jti")
         exp = token_data.get("exp")
         
+        if not jti:
+            # 如果令牌没有 JTI，登出可能无法精确工作，记录警告
+            # 可以选择拒绝登出或使用 user_id 作为后备 (但不推荐)
+            logger.warning(f"用户 {current_user.id} 尝试登出一个没有 JTI 的令牌")
+            # raise HTTPException(status_code=400, detail="无法注销此令牌")
+            jti = str(current_user.id) # 使用 user_id 作为后备 (风险：会注销该用户所有无 JTI 的令牌)
+
         if not exp:
-            # 如果无法获取过期时间，使用当前时间加上默认过期时间
-            exp_time = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            logger.warning(f"令牌 {jti} 没有过期时间，使用默认值计算黑名单有效期")
+            expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         else:
-            exp_time = datetime.fromtimestamp(exp)
-            
-        # 将令牌添加到黑名单
-        logout_tokens[jti] = exp_time
-        
-        # 清理过期的登出令牌
-        await cleanup_expired_tokens_compat()
-        
-        logger.info(f"用户 {current_user.id} ({current_user.email}) 登出成功")
+            # 计算剩余有效期，用于设置黑名单过期时间
+            exp_time = datetime.fromtimestamp(exp, UTC)
+            now = datetime.now(UTC)
+            expires_delta = exp_time - now
+            # 如果令牌已过期，理论上 get_current_user 就会失败，但这里可以加个检查
+            if expires_delta.total_seconds() <= 0:
+                 logger.info(f"令牌 {jti} 已过期，无需加入黑名单")
+                 return {"detail": "登出成功 (令牌已过期)"}
+
+        # --- 调用黑名单服务 ---
+        added = await add_to_blacklist(token_jti=jti, expires_delta=expires_delta)
+        if not added:
+             logger.error(f"无法将令牌 {jti} 添加到黑名单")
+             # 可以选择是否通知用户失败
+             # raise HTTPException(status_code=500, detail="登出操作失败")
+
+        # 清理过期的登出令牌 (移除调用 - Redis 会自动处理)
+        # await cleanup_expired_tokens_compat()
+
+        logger.info(f"用户 {current_user.id} ({current_user.email}) 登出成功，令牌 {jti} 已加入黑名单")
         return {"detail": "登出成功"}
     
     except HTTPException:
@@ -153,42 +175,19 @@ async def register_user(
     logger.info(f"新用户注册请求: {user_in.email}")
     
     try:
-        # 检查邮箱是否已存在
-        query = select(User).where(User.email == user_in.email.lower())
-        logger.debug(f"执行查询: {query}")
-        result = await db.execute(query)
-        user = result.scalar_one_or_none()
-        
-        if user:
-            logger.warning(f"注册失败: 邮箱 {user_in.email} 已被注册")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="该邮箱已被注册",
-            )
-        
-        # 创建新用户
-        logger.debug(f"创建新用户: {user_in.email}")
-        hashed_password = get_password_hash(user_in.password)
-        db_user = User(
-            email=user_in.email.lower(),
-            hashed_password=hashed_password,
-            username=user_in.username,
-            full_name=user_in.full_name,
-            is_active=True,
-        )
-        
-        db.add(db_user)
-        await db.commit()
-        await db.refresh(db_user)
+        # --- 调用服务层创建用户 ---
+        # 服务层内部会处理邮箱已存在的检查
+        db_user = await user_service.create_user(db=db, user_create_data=user_in)
         
         logger.info(f"新用户注册成功: ID={db_user.id}, 邮箱={db_user.email}")
+        # FastAPI 会自动将 User ORM 对象转换为 UserResponse
         return db_user
         
     except HTTPException:
-        # 直接重新抛出HTTP异常
+        # 直接重新抛出服务层抛出的 HTTP 异常 (例如邮箱已存在)
         raise
     except Exception as e:
-        logger.error(f"用户注册过程中发生错误: {str(e)}", exc_info=True)
+        logger.error(f"用户注册过程中发生错误 (API层): {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="用户注册过程中发生错误"

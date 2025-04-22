@@ -24,14 +24,16 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=settings.FULL_AUTH_TOKEN_URL)
 # 数据库会话依赖
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """提供数据库会话的FastAPI依赖"""
-    logger.debug("获取数据库会话")
+    logger.debug("获取数据库会话依赖")
+    # get_session 使用了 asynccontextmanager 和 yield，会自动处理会话关闭和回滚
     async for session in get_session():
         try:
-            logger.debug("数据库会话已创建")
+            logger.debug("数据库会话已生成并提供")
             yield session
         finally:
-            logger.debug("关闭数据库会话")
-            await session.close()
+            # 不再需要显式关闭，async with async_session() as session 会处理
+            # await session.close()
+            logger.debug("数据库会话生命周期结束 (由 get_session 管理)")
 
 # 当前用户依赖
 async def get_current_user(

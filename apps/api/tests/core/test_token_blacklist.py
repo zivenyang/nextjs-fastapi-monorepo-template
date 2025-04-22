@@ -1,111 +1,80 @@
 import pytest
 from datetime import datetime, timedelta, UTC
 import time
+from unittest.mock import patch, AsyncMock
 
-from app.core.token_blacklist import logout_tokens, cleanup_expired_tokens_compat, add_to_blacklist
+from app.core.token_blacklist import add_to_blacklist, is_blacklisted
+# 不再需要导入 jwt_cache_instance 进行清理
 
 # 标记所有测试为单元测试
 pytestmark = [pytest.mark.asyncio, pytest.mark.unit]
 
+@pytest.fixture
+def mock_jwt_cache():
+    """Mock jwt_cache_instance"""
+    cache_mock = AsyncMock()
+    cache_mock.setex.return_value = True
+    cache_mock.exists.return_value = False # 默认不存在
+    with patch("app.core.token_blacklist.jwt_cache_instance", cache_mock):
+         yield cache_mock
 
-async def test_logout_tokens_dictionary():
-    """测试 logout_tokens 字典是否正确初始化"""
-    # 检查 logout_tokens 是否是字典类型
-    assert isinstance(logout_tokens, dict)
-    # 初始状态下应该是空的
-    initial_length = len(logout_tokens)
+async def test_add_valid_token(mock_jwt_cache):
+    """测试添加有效令牌到黑名单"""
+    token_jti = "valid-jti-1"
+    expires = timedelta(minutes=10)
+    
+    result = await add_to_blacklist(token_jti, expires)
+    
+    assert result is True
+    mock_jwt_cache.setex.assert_called_once_with(
+        token_jti, int(expires.total_seconds()), "1"
+    )
 
+async def test_add_expired_token(mock_jwt_cache):
+    """测试尝试添加已过期令牌 (应跳过并返回True)"""
+    token_jti = "expired-jti"
+    expires = timedelta(minutes=-10) # 已过期
 
-async def test_add_token_to_blacklist():
-    """测试向黑名单中添加令牌"""
-    # 清空之前的测试数据
-    logout_tokens.clear()
-    
-    # 创建一个测试令牌
-    token_id = "test-token-1"
-    # 设置过期时间为当前时间后5分钟
-    expiry = datetime.now(UTC) + timedelta(minutes=5)
-    
-    # 添加令牌到黑名单
-    logout_tokens[token_id] = expiry
-    
-    # 验证令牌是否在黑名单中
-    assert token_id in logout_tokens
-    assert logout_tokens[token_id] == expiry
+    result = await add_to_blacklist(token_jti, expires)
 
+    assert result is True # 视为成功，因为它已经无效
+    mock_jwt_cache.setex.assert_not_called() # 不应调用 setex
 
-async def test_cleanup_expired_tokens():
-    """测试清理过期令牌的功能"""
-    # 清空之前的测试数据
-    logout_tokens.clear()
-    
-    # 添加一个过期的令牌（过期时间为1分钟前）
-    expired_token = "expired-token"
-    expired_time = datetime.now(UTC) - timedelta(minutes=1)
-    logout_tokens[expired_token] = expired_time
-    
-    # 添加一个未过期的令牌（过期时间为5分钟后）
-    valid_token = "valid-token"
-    valid_time = datetime.now(UTC) + timedelta(minutes=5)
-    logout_tokens[valid_token] = valid_time
-    
-    # 执行清理
-    result = await cleanup_expired_tokens_compat()
-    
-    # 验证过期的令牌已被移除，而未过期的仍然存在
-    assert expired_token not in logout_tokens, f"过期令牌 {expired_token} 应该已被移除，但仍存在于字典中"
-    assert valid_token in logout_tokens, f"有效令牌 {valid_token} 应该仍在字典中，但已被移除"
-    assert logout_tokens[valid_token] == valid_time
+async def test_add_token_redis_error(mock_jwt_cache):
+    """测试添加令牌时Redis出错"""
+    token_jti = "error-jti"
+    expires = timedelta(minutes=10)
+    mock_jwt_cache.setex.side_effect = Exception("Redis connection error")
 
+    result = await add_to_blacklist(token_jti, expires)
 
-async def test_cleanup_with_multiple_expired_tokens():
-    """测试同时清理多个过期令牌"""
-    # 清空之前的测试数据
-    logout_tokens.clear()
-    
-    # 添加多个过期的令牌
-    now = datetime.now(UTC)
-    for i in range(5):
-        token_id = f"expired-token-{i}"
-        # 每个令牌都设置为过期（过期时间为 i+1 分钟前）
-        expiry = now - timedelta(minutes=i+1)
-        logout_tokens[token_id] = expiry
-    
-    # 添加一个未过期的令牌
-    valid_token = "still-valid"
-    valid_expiry = now + timedelta(minutes=10)
-    logout_tokens[valid_token] = valid_expiry
-    
-    # 执行清理
-    result = await cleanup_expired_tokens_compat()
-    
-    # 验证所有过期令牌都被移除
-    for i in range(5):
-        token_id = f"expired-token-{i}"
-        assert token_id not in logout_tokens, f"过期令牌 {token_id} 应该已被移除，但仍存在于字典中"
-    
-    # 验证未过期令牌仍然存在
-    assert valid_token in logout_tokens, f"有效令牌 {valid_token} 应该仍在字典中，但已被移除"
+    assert result is False # 添加失败
 
+async def test_is_blacklisted_false(mock_jwt_cache):
+    """测试令牌不在黑名单中"""
+    token_jti = "not-blacklisted-jti"
+    mock_jwt_cache.exists.return_value = False # 模拟 Redis 返回不存在
 
-async def test_token_expiration_check():
-    """测试令牌过期检查逻辑"""
-    # 清空之前的测试数据
-    logout_tokens.clear()
-    
-    # 添加一个即将过期的令牌（过期时间为0.5秒后）
-    soon_expire_token = "soon-expire"
-    soon_expire_time = datetime.now(UTC) + timedelta(seconds=0.5)
-    logout_tokens[soon_expire_token] = soon_expire_time
-    
-    # 初始状态下令牌应该存在
-    assert soon_expire_token in logout_tokens
-    
-    # 等待0.6秒，使令牌过期
-    time.sleep(0.6)
-    
-    # 执行清理
-    result = await cleanup_expired_tokens_compat()
-    
-    # 验证令牌已被清理
-    assert soon_expire_token not in logout_tokens, f"过期令牌 {soon_expire_token} 应该已被移除，但仍存在于字典中" 
+    result = await is_blacklisted(token_jti)
+
+    assert result is False
+    mock_jwt_cache.exists.assert_called_once_with(token_jti)
+
+async def test_is_blacklisted_true(mock_jwt_cache):
+    """测试令牌在黑名单中"""
+    token_jti = "is-blacklisted-jti"
+    mock_jwt_cache.exists.return_value = True # 模拟 Redis 返回存在
+
+    result = await is_blacklisted(token_jti)
+
+    assert result is True
+    mock_jwt_cache.exists.assert_called_once_with(token_jti)
+
+async def test_is_blacklisted_redis_error(mock_jwt_cache):
+    """测试检查黑名单时Redis出错 (应返回True)"""
+    token_jti = "check-error-jti"
+    mock_jwt_cache.exists.side_effect = Exception("Redis connection error")
+
+    result = await is_blacklisted(token_jti)
+
+    assert result is True # 出错时视为在黑名单中 
