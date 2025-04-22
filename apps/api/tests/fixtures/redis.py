@@ -1,10 +1,11 @@
 # apps/api/tests/fixtures/redis.py
 import pytest_asyncio
 import redis.asyncio as redis_async
+from typing import AsyncGenerator  # 导入 AsyncGenerator
 from app.core.config import settings # 导入应用配置
 
 @pytest_asyncio.fixture(scope="function") # function scope 保证每个测试都有新连接
-async def redis_client() -> redis_async.Redis | None:
+async def redis_client() -> AsyncGenerator[redis_async.Redis | None, None]:
     """
     提供一个连接到测试 Redis 的客户端，并在测试结束后关闭连接。
     """
