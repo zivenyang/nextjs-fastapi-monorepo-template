@@ -4,17 +4,20 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
+# 不再需要直接从端点导入 AsyncSession
+# from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import get_db, get_current_user
-from app.core.config import settings
+# 导入新的依赖和类型
+from app.api.deps import get_current_user, get_user_service, get_settings 
+from app.core.config import Settings # 导入类型
 from app.core.security import create_access_token, get_password_hash, verify_password, decode_jwt_token
 from app.models.user import User
 from app.schemas.auth import Token
 from app.schemas.user import UserCreate, UserResponse
 from app.core.logging import get_logger
 from app.core.token_blacklist import add_to_blacklist
-from app.services.user_service import user_service
+# 导入 UserService 类型
+from app.services.user_service import UserService
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
@@ -24,8 +27,11 @@ router = APIRouter()
 
 @router.post("/login", response_model=Token)
 async def login_access_token(
-    db: AsyncSession = Depends(get_db),
+    # 移除 db: AsyncSession = Depends(get_db)
     form_data: OAuth2PasswordRequestForm = Depends(),
+    # 注入依赖
+    user_service_instance: UserService = Depends(get_user_service),
+    app_settings: Settings = Depends(get_settings),
 ) -> Any:
     """
     OAuth2 密码流认证，获取JWT token
@@ -33,8 +39,8 @@ async def login_access_token(
     logger.info(f"用户登录尝试: {form_data.username}")
     
     try:
-        # 查询用户
-        user = await user_service.get_user_by_email(db=db, email=form_data.username)
+        # 使用注入的服务实例，不再传递 db
+        user = await user_service_instance.get_user_by_email(email=form_data.username)
         
         # 验证用户和密码
         if not user:
@@ -64,8 +70,8 @@ async def login_access_token(
                 detail="用户未激活"
             )
         
-        # 创建访问令牌
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        # 使用注入的 settings
+        access_token_expires = timedelta(minutes=app_settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         token = create_access_token(
             subject=str(user.id), expires_delta=access_token_expires
         )
@@ -88,6 +94,10 @@ async def login_access_token(
 async def logout(
     authorization: str = Header(...),
     current_user: User = Depends(get_current_user),
+    # 注入 settings
+    app_settings: Settings = Depends(get_settings),
+    # 如果 add_to_blacklist 需要 redis client, 需要注入 BlacklistService
+    # blacklist_service: BlacklistService = Depends(get_blacklist_service)
 ) -> Any:
     """
     用户登出，将当前令牌加入黑名单
@@ -129,7 +139,8 @@ async def logout(
 
         if not exp:
             logger.warning(f"令牌 {jti} 没有过期时间，使用默认值计算黑名单有效期")
-            expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            # 使用注入的 settings
+            expires_delta = timedelta(minutes=app_settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         else:
             # 计算剩余有效期，用于设置黑名单过期时间
             exp_time = datetime.fromtimestamp(exp, UTC)
@@ -141,6 +152,7 @@ async def logout(
                  return {"detail": "登出成功 (令牌已过期)"}
 
         # --- 调用黑名单服务 ---
+        # 如果注入服务: await blacklist_service.add_to_blacklist(token_jti=jti, expires_delta=expires_delta)
         added = await add_to_blacklist(token_jti=jti, expires_delta=expires_delta)
         if not added:
              logger.error(f"无法将令牌 {jti} 添加到黑名单")
@@ -165,9 +177,12 @@ async def logout(
 
 @router.post("/register", response_model=UserResponse)
 async def register_user(
-    *,
-    db: AsyncSession = Depends(get_db),
+    # 移除 db: AsyncSession = Depends(get_db)
     user_in: UserCreate,
+    # 注入依赖
+    user_service_instance: UserService = Depends(get_user_service),
+    # 注入 settings (虽然此端点当前未使用，但保持一致性是好的)
+    app_settings: Settings = Depends(get_settings),
 ) -> Any:
     """
     注册新用户
@@ -175,9 +190,8 @@ async def register_user(
     logger.info(f"新用户注册请求: {user_in.email}")
     
     try:
-        # --- 调用服务层创建用户 ---
-        # 服务层内部会处理邮箱已存在的检查
-        db_user = await user_service.create_user(db=db, user_create_data=user_in)
+        # 使用注入的服务实例，不再传递 db
+        db_user = await user_service_instance.create_user(user_create_data=user_in)
         
         logger.info(f"新用户注册成功: ID={db_user.id}, 邮箱={db_user.email}")
         # FastAPI 会自动将 User ORM 对象转换为 UserResponse

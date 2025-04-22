@@ -2,13 +2,19 @@ from typing import Any, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel.ext.asyncio.session import AsyncSession
+# 不再需要直接从端点导入 AsyncSession
+# from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+# 导入新的依赖和类型
+from app.api.deps import get_current_user, get_user_service, get_settings
 from app.models.user import User
 from app.schemas.user import UserResponse, UserUpdate
 from app.core.logging import get_logger
-from app.services.user_service import user_service
+# 导入 UserService 和 Settings 类型
+from app.services.user_service import UserService
+from app.core.config import Settings
+# 移除对全局实例的导入
+# from app.services.user_service import user_service
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
@@ -18,10 +24,13 @@ router = APIRouter()
 
 @router.get("/", response_model=List[UserResponse])
 async def read_users(
-    db: AsyncSession = Depends(get_db),
+    # 移除 db: AsyncSession = Depends(get_db)
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_current_user),
+    # 注入依赖
+    user_service_instance: UserService = Depends(get_user_service),
+    app_settings: Settings = Depends(get_settings),
 ) -> Any:
     """
     获取用户列表。
@@ -37,9 +46,9 @@ async def read_users(
             detail="权限不足，需要管理员权限"
         )
 
-    # --- 调用服务层 ---
+    # --- 调用注入的服务实例 --- (不再传递 db)
     try:
-        users = await user_service.get_users(db=db, skip=skip, limit=limit)
+        users = await user_service_instance.get_users(skip=skip, limit=limit)
         logger.info(f"成功获取 {len(users)} 个用户记录")
         # FastAPI 会自动处理 response_model 的转换
         return users
@@ -54,19 +63,20 @@ async def read_users(
 
 @router.get("/me", response_model=UserResponse)
 async def read_user_me(
+    # 移除 db: AsyncSession = Depends(get_db)
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    # 注入依赖
+    user_service_instance: UserService = Depends(get_user_service),
+    app_settings: Settings = Depends(get_settings),
 ) -> Any:
     """
     获取当前用户信息（包含个人资料）。
     """
     logger.info(f"用户 {current_user.id} 请求获取个人信息")
 
-    # --- 调用服务层获取用户和资料 ---
-    # 注意: current_user 是通过 get_current_user 获取的，可能不包含 profile
-    # 我们需要通过服务层重新获取完整的用户和资料信息
+    # --- 调用注入的服务实例，不再传递 db ---
     try:
-        user_data = await user_service.get_user_with_profile(db=db, user_id=current_user.id)
+        user_data = await user_service_instance.get_user_with_profile(user_id=current_user.id)
         if not user_data:
              # 这理论上不应该发生，因为 current_user 存在
              logger.error(f"获取当前用户信息失败: 未找到用户 {current_user.id}")
@@ -95,8 +105,11 @@ async def read_user_me(
 @router.get("/{user_id}", response_model=UserResponse)
 async def read_user(
     user_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    # 移除 db: AsyncSession = Depends(get_db)
     current_user: User = Depends(get_current_user),
+    # 注入依赖
+    user_service_instance: UserService = Depends(get_user_service),
+    app_settings: Settings = Depends(get_settings),
 ) -> Any:
     """
     根据ID获取用户（包含个人资料）。
@@ -112,9 +125,9 @@ async def read_user(
             detail="权限不足，无法访问其他用户信息"
         )
 
-    # --- 调用服务层 ---
+    # --- 调用注入的服务实例，不再传递 db ---
     try:
-        user_data = await user_service.get_user_with_profile(db=db, user_id=user_id)
+        user_data = await user_service_instance.get_user_with_profile(user_id=user_id)
 
         if not user_data:
             logger.warning(f"未找到用户: {user_id}")
@@ -146,21 +159,24 @@ async def read_user(
 @router.patch("/me", response_model=UserResponse)
 async def update_user_me(
     *,
-    db: AsyncSession = Depends(get_db),
+    # 移除 db: AsyncSession = Depends(get_db)
     user_update: UserUpdate,
     current_user: User = Depends(get_current_user),
+    # 注入依赖
+    user_service_instance: UserService = Depends(get_user_service),
+    app_settings: Settings = Depends(get_settings),
 ) -> Any:
     """
     更新当前用户信息（包含个人资料）。
     """
     logger.info(f"用户 {current_user.id} 请求更新个人信息")
 
-    # --- 调用服务层 ---
+    # --- 调用注入的服务实例，不再传递 db ---
     try:
         # 注意：我们将 current_user (从 token 获取的 User 对象)
         # 和 user_update (请求体中的更新数据) 传递给服务层
-        updated_user, updated_profile = await user_service.update_user(
-            db=db, user_to_update=current_user, user_update_data=user_update
+        updated_user, updated_profile = await user_service_instance.update_user(
+            user_to_update=current_user, user_update_data=user_update
         )
 
         # --- 构建响应 ---

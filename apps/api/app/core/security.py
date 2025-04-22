@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Union, Optional, Dict
 import uuid
 
+# 导入 OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from pwdlib import PasswordHash
 from pwdlib.hashers.bcrypt import BcryptHasher
@@ -11,6 +13,11 @@ from app.core.logging import get_logger
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
+
+# 定义 OAuth2 密码 Bearer 方案
+# tokenUrl 指向获取令牌的端点 (即登录接口)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+logger.debug(f"OAuth2PasswordBearer scheme initialized (tokenUrl: /api/v1/auth/login)")
 
 # 正确初始化 PasswordHash，传入 Hasher 实例的元组
 pwd_hasher = PasswordHash((BcryptHasher(),))

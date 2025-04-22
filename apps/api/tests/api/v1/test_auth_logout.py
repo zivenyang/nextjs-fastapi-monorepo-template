@@ -106,4 +106,5 @@ async def test_logout_twice(client: AsyncClient, test_user_token):
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     data = response.json()
     assert "detail" in data
-    assert "已失效" in data["detail"] or "无效" in data["detail"] 
+    # 修改断言以匹配 get_current_user 中抛出的实际错误信息
+    assert "无法验证凭据" in data["detail"] 

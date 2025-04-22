@@ -16,17 +16,16 @@ logger = get_logger(__name__)
 class UserService:
     """用户相关的业务逻辑服务"""
 
-    def __init__(self):
+    def __init__(self, db: AsyncSession):
+        self.db = db
         # 初始化 logger 实例
         self.logger = get_logger(__name__)
 
-    async def get_user_by_id(
-        self, db: AsyncSession, user_id: UUID
-    ) -> Optional[User]:
+    async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
         """通过ID获取单个用户"""
         self.logger.debug(f"服务层: 开始查询用户 {user_id}")
         query = select(User).where(User.id == user_id)
-        result = await db.execute(query)
+        result = await self.db.execute(query)
         user = result.scalar_one_or_none()
         if user:
             self.logger.debug(f"服务层: 找到用户 {user_id}")
@@ -34,35 +33,29 @@ class UserService:
             self.logger.debug(f"服务层: 未找到用户 {user_id}")
         return user
 
-    async def get_user_with_profile(
-        self, db: AsyncSession, user_id: UUID
-    ) -> Optional[tuple[User, Optional[UserProfile]]]:
+    async def get_user_with_profile(self, user_id: UUID) -> Optional[tuple[User, Optional[UserProfile]]]:
         """获取用户及其关联的个人资料"""
         self.logger.debug(f"服务层: 开始查询用户及资料 {user_id}")
-        user = await self.get_user_by_id(db, user_id)
+        user = await self.get_user_by_id(user_id)
         if not user:
             return None
 
         profile_query = select(UserProfile).where(UserProfile.user_id == user_id)
-        profile_result = await db.execute(profile_query)
+        profile_result = await self.db.execute(profile_query)
         profile = profile_result.scalar_one_or_none()
         self.logger.debug(f"服务层: 获取用户 {user_id} 的资料完成 (资料存在: {profile is not None})")
         return user, profile
 
-    async def get_users(
-        self, db: AsyncSession, skip: int = 0, limit: int = 100
-    ) -> List[User]:
+    async def get_users(self, skip: int = 0, limit: int = 100) -> List[User]:
         """获取用户列表 (分页)"""
         self.logger.debug(f"服务层: 开始查询用户列表 (skip={skip}, limit={limit})")
         query = select(User).offset(skip).limit(limit)
-        result = await db.execute(query)
+        result = await self.db.execute(query)
         users = result.scalars().all()
         self.logger.debug(f"服务层: 成功获取 {len(users)} 个用户")
         return users
 
-    async def update_user(
-        self, db: AsyncSession, user_to_update: User, user_update_data: UserUpdate
-    ) -> tuple[User, Optional[UserProfile]]:
+    async def update_user(self, user_to_update: User, user_update_data: UserUpdate) -> tuple[User, Optional[UserProfile]]:
         """更新用户信息和资料"""
         self.logger.debug(f"服务层: 开始更新用户 {user_to_update.id}")
         user_data = user_update_data.model_dump(exclude_unset=True, exclude={"profile", "password"})
@@ -71,14 +64,14 @@ class UserService:
         if user_data:
             for key, value in user_data.items():
                 setattr(user_to_update, key, value)
-            db.add(user_to_update)
+            self.db.add(user_to_update)
             self.logger.debug(f"服务层: 用户 {user_to_update.id} 基本信息已更新")
 
         # 更新密码
         if user_update_data.password:
             hashed_password = get_password_hash(user_update_data.password)
             user_to_update.hashed_password = hashed_password
-            db.add(user_to_update)
+            self.db.add(user_to_update)
             self.logger.info(f"服务层: 用户 {user_to_update.id} 密码已更新")
 
         # 处理资料更新
@@ -88,56 +81,48 @@ class UserService:
             if profile_data:
                 # 查询现有资料
                 query = select(UserProfile).where(UserProfile.user_id == user_to_update.id)
-                result = await db.execute(query)
+                result = await self.db.execute(query)
                 profile = result.scalar_one_or_none()
 
                 if profile:
                     self.logger.debug(f"服务层: 更新用户 {user_to_update.id} 的现有资料")
                     for key, value in profile_data.items():
                         setattr(profile, key, value)
-                    db.add(profile)
+                    self.db.add(profile)
                     updated_profile = profile
                 else:
                     self.logger.debug(f"服务层: 为用户 {user_to_update.id} 创建新的资料")
                     new_profile = UserProfile(user_id=user_to_update.id, **profile_data)
-                    db.add(new_profile)
+                    self.db.add(new_profile)
                     updated_profile = new_profile
         
         try:
-            await db.commit()
-            await db.refresh(user_to_update)
+            await self.db.commit()
+            await self.db.refresh(user_to_update)
             if updated_profile:
-                 # 如果更新了profile，也refresh一下以获取数据库可能生成的默认值（如ID）
-                 # 但如果profile是新创建的，直接使用new_profile对象即可
-                 # 如果是更新的，需要refresh
-                 # 检查 updated_profile 是否已经被添加到 session 中并且有持久化标识 (通常是 id)
-                 # 或者更简单的方式是，如果它是新创建的对象实例，就不需要refresh
-                 if profile and profile is updated_profile: # 仅当更新现有profile时refresh
-                     await db.refresh(updated_profile)
+                 if profile and profile is updated_profile:
+                     await self.db.refresh(updated_profile)
 
             self.logger.info(f"服务层: 用户 {user_to_update.id} 信息更新成功")
-            # 重新获取更新后的 profile (如果在本次操作中创建或更新了)
-            if not updated_profile: # 如果上面没处理 profile，则查询一下
+            if not updated_profile:
                 profile_query = select(UserProfile).where(UserProfile.user_id == user_to_update.id)
-                profile_result = await db.execute(profile_query)
+                profile_result = await self.db.execute(profile_query)
                 updated_profile = profile_result.scalar_one_or_none()
                 
             return user_to_update, updated_profile
         except Exception as e:
-            await db.rollback()
+            await self.db.rollback()
             self.logger.error(f"服务层: 更新用户 {user_to_update.id} 失败: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="更新用户信息时发生内部错误"
             )
 
-    async def get_user_by_email(
-        self, db: AsyncSession, email: str
-    ) -> Optional[User]:
+    async def get_user_by_email(self, email: str) -> Optional[User]:
         """通过邮箱获取用户"""
         self.logger.debug(f"服务层: 开始查询用户 (邮箱: {email})")
         query = select(User).where(User.email == email.lower())
-        result = await db.execute(query)
+        result = await self.db.execute(query)
         user = result.scalar_one_or_none()
         if user:
             self.logger.debug(f"服务层: 找到用户 (邮箱: {email})")
@@ -145,14 +130,12 @@ class UserService:
             self.logger.debug(f"服务层: 未找到用户 (邮箱: {email})")
         return user
 
-    async def create_user(
-        self, db: AsyncSession, user_create_data: UserCreate
-    ) -> User:
+    async def create_user(self, user_create_data: UserCreate) -> User:
         """创建新用户"""
         self.logger.debug(f"服务层: 开始创建用户 (邮箱: {user_create_data.email})")
         
         # 在服务层进行邮箱存在性检查
-        existing_user = await self.get_user_by_email(db, user_create_data.email)
+        existing_user = await self.get_user_by_email(user_create_data.email)
         if existing_user:
             self.logger.warning(f"服务层: 注册失败 - 邮箱 {user_create_data.email} 已存在")
             raise HTTPException(
@@ -177,13 +160,13 @@ class UserService:
                 created_at=datetime.now(timezone.utc),
             )
 
-            db.add(db_user)
-            await db.commit()
-            await db.refresh(db_user)
+            self.db.add(db_user)
+            await self.db.commit()
+            await self.db.refresh(db_user)
             self.logger.info(f"服务层: 新用户创建成功 (ID: {db_user.id})")
             return db_user
         except Exception as e:
-            await db.rollback()
+            await self.db.rollback()
             self.logger.error(f"服务层: 创建用户失败: {str(e)}", exc_info=True)
             # 重新抛出通用错误，让上层处理
             raise HTTPException(
@@ -191,7 +174,5 @@ class UserService:
                 detail="创建用户时发生内部错误"
             )
 
-# 创建一个全局实例，方便在依赖注入中使用 (或者在deps.py中创建)
 # 不再需要全局 logger，因为每个服务实例都有自己的 logger
-# logger = get_logger(__name__)
-user_service = UserService() 
+# logger = get_logger(__name__) 
