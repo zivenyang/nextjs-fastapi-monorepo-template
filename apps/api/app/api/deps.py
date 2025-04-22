@@ -69,18 +69,17 @@ def get_user_service(
     logger.debug("创建 UserService 实例 (依赖于仓库)")
     return UserService(db=db, user_repo=user_repo)
 
-# 当前用户依赖 (需要确保 get_user_by_id 在仓库中或直接用 db.get)
-# 注意: get_current_user 当前直接使用 db.get(User, UUID(user_id))
-# 这绕过了仓库层。理想情况下，它应该依赖 UserService 或 UserRepository。
-# 为了减少本次修改范围，暂时保持不变，但这是一个后续改进点。
+# 当前用户依赖 (已改进)
 async def get_current_user(
-    db: AsyncSession = Depends(get_db), # 保持 db 依赖用于直接查找
-    # 或者: user_repo: IUserRepository = Depends(get_user_repository),
+    # 不再直接依赖 db
+    # db: AsyncSession = Depends(get_db),
+    # 改为依赖仓库
+    user_repo: IUserRepository = Depends(get_user_repository),
     token: str = Depends(security.oauth2_scheme),
     app_settings: Settings = Depends(get_settings)
 ) -> User:
-    """验证token并获取当前用户 (包含黑名单检查)"""
-    logger.debug("验证用户令牌")
+    """验证token并获取当前用户 (包含黑名单检查)，通过仓库获取用户。"""
+    logger.debug("验证用户令牌并通过仓库获取用户")
 
     try:
         payload = security.decode_jwt_token(token)
@@ -88,26 +87,36 @@ async def get_current_user(
             logger.warning("获取当前用户失败: 令牌解码失败或无效")
             raise InvalidTokenException(detail="无效或格式错误的认证令牌")
 
-        user_id: str | None = payload.get("sub")
+        user_id_str: str | None = payload.get("sub")
         jti: str | None = payload.get("jti")
 
-        if user_id is None:
+        if user_id_str is None:
             logger.warning("获取当前用户失败: 令牌中缺少 'sub' (user_id)")
             raise InvalidTokenException(detail="无效或格式错误的认证令牌")
+            
+        # 尝试将 user_id 转换为 UUID
+        try:
+            user_id = UUID(user_id_str)
+        except ValueError:
+            logger.warning(f"获取当前用户失败: 令牌中的 'sub' ({user_id_str}) 不是有效的UUID")
+            raise InvalidTokenException(detail="令牌格式错误")
 
         if jti and await is_blacklisted(jti):
             logger.warning(f"获取当前用户失败: 令牌已加入黑名单 (jti: {jti})")
             raise InvalidTokenException(detail="认证令牌已失效 (已登出)")
 
-        # --- 用户查找：保持使用 db.get 或改为使用仓库 --- 
+        # --- 用户查找：使用仓库 --- 
         try:
-            user = await db.get(User, UUID(user_id))
+            # 使用注入的仓库获取用户
+            user = await user_repo.get_by_id(user_id)
         except Exception as e:
-            logger.error(f"根据令牌中的 user_id ({user_id}) 查找用户时出错: {e}", exc_info=True)
-            raise InvalidTokenException(detail="无法根据令牌查找用户")
+            # 捕获仓库查找过程中可能出现的未知错误
+            logger.error(f"通过仓库根据 user_id ({user_id}) 查找用户时出错: {e}", exc_info=True)
+            raise AppException(detail="查找用户时发生内部错误", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         if user is None:
             logger.warning(f"获取当前用户失败: 未找到用户ID {user_id}")
+            # 用户未找到是令牌无效的一种情况，或者说令牌对应的用户不存在
             raise UserNotFoundException(detail="令牌对应的用户不存在")
 
     except (JWTError, ValidationError) as e: # 捕获已知的解码/验证错误
