@@ -13,6 +13,16 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+# --- 添加异常类定义 ---
+class UserNotFoundException(Exception):
+    """当尝试操作的用户不存在时抛出"""
+    pass
+
+class EmailAlreadyExistsException(Exception):
+    """当尝试创建的用户邮箱已存在时抛出"""
+    pass
+# --- 结束添加 ---
+
 class UserService:
     """用户相关的业务逻辑服务"""
 
@@ -138,10 +148,7 @@ class UserService:
         existing_user = await self.get_user_by_email(user_create_data.email)
         if existing_user:
             self.logger.warning(f"服务层: 注册失败 - 邮箱 {user_create_data.email} 已存在")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="该邮箱已被注册",
-            )
+            raise EmailAlreadyExistsException(f"邮箱 {user_create_data.email} 已被注册")
             
         try:
             hashed_password = get_password_hash(user_create_data.password)

@@ -3,21 +3,20 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlmodel import select
 # 不再需要直接从端点导入 AsyncSession
 # from sqlmodel.ext.asyncio.session import AsyncSession
 
 # 导入新的依赖和类型
 from app.api.deps import get_current_user, get_user_service, get_settings 
 from app.core.config import Settings # 导入类型
-from app.core.security import create_access_token, get_password_hash, verify_password, decode_jwt_token
+from app.core.security import create_access_token, verify_password, decode_jwt_token
 from app.models.user import User
 from app.schemas.auth import Token
 from app.schemas.user import UserCreate, UserResponse
 from app.core.logging import get_logger
 from app.core.token_blacklist import add_to_blacklist
-# 导入 UserService 类型
-from app.services.user_service import UserService
+# 导入 UserService 类型和异常
+from app.services.user_service import UserService, EmailAlreadyExistsException
 
 # 创建模块日志记录器
 logger = get_logger(__name__)
@@ -197,12 +196,18 @@ async def register_user(
         # FastAPI 会自动将 User ORM 对象转换为 UserResponse
         return db_user
         
+    except EmailAlreadyExistsException as e:
+        logger.warning(f"注册失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"注册失败：{str(e)}" # 可以直接使用异常消息
+        )
     except HTTPException:
-        # 直接重新抛出服务层抛出的 HTTP 异常 (例如邮箱已存在)
+        # 直接重新抛出 HTTPExceptions
         raise
     except Exception as e:
-        logger.error(f"用户注册过程中发生错误 (API层): {str(e)}", exc_info=True)
+        logger.error(f"创建用户时发生内部错误: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="用户注册过程中发生错误"
+            detail="创建用户时发生内部错误"
         ) 
