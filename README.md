@@ -37,7 +37,36 @@
 - SQLModel用于数据库ORM
 - JWT认证机制
 
-## 认证系统
+#### 分层架构与仓储模式
+
+为了更好地组织代码和解耦，后端采用了分层架构，并引入了**仓储模式 (Repository Pattern)**：
+
+1.  **接口层 (API Endpoints - `app/api/v1/endpoints/`)**:
+    *   负责处理 HTTP 请求和响应。
+    *   依赖于服务层来执行业务操作。
+    *   使用 Pydantic/SQLModel schemas (`app/schemas/`) 定义 API 数据结构。
+
+2.  **服务层 (Services - `app/services/`)**:
+    *   包含核心业务逻辑（例如，用户注册流程、信息更新规则）。
+    *   依赖于**仓储接口** (`app/repositories/interfaces/`) 来进行数据持久化操作。
+    *   **负责事务管理**（控制数据库 `commit`, `rollback`, `refresh`）。目前事务控制在服务层，未来可能引入 Unit of Work (UoW) 模式进一步优化。
+
+3.  **仓储层 (Repositories)**:
+    *   **接口 (`app/repositories/interfaces/`)**: 定义数据访问操作的契约（例如 `IUserRepository` 定义了获取、创建、更新用户的方法）。服务层依赖这些接口。
+    *   **实现 (`app/repositories/sql/`)**: 提供仓库接口的具体实现（例如 `SQLUserRepository` 使用 `AsyncSession` 和 SQLModel 执行数据库操作）。这部分封装了数据访问的细节。
+
+4.  **数据模型层 (Models - `app/models/`)**:
+    *   定义应用程序的数据结构和数据库表映射（使用 SQLModel）。
+
+这种架构使得：
+*   **业务逻辑**与**数据访问逻辑**分离。
+*   **服务层**的单元测试更加简单，只需 Mock 仓库接口。
+*   **仓库实现**可以独立测试其数据库交互。
+*   未来更换数据库技术或 ORM 对业务逻辑层的影响更小。
+
+依赖注入系统 (`app/api/deps.py`) 负责将具体的仓库实现 (`SQLUserRepository`) 注入到需要仓库接口 (`IUserRepository`) 的服务层 (`UserService`) 中。
+
+### JWT 认证系统
 
 项目实现了完整的JWT认证系统：
 
