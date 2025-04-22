@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
+from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -35,6 +36,7 @@ async def init_db():
         raise
 
 
+@asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """获取异步数据库会话"""
     async_session = sessionmaker(
